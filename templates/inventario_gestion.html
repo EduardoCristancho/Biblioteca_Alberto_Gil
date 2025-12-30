@@ -1,0 +1,783 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Inventario{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <div>
+            <h1>Gestión de Inventario</h1>
+            <p>Administración completa del catálogo bibliotecario</p>
+        </div>
+        <a href="{% url 'registrar_inventario' %}" class="btn-primary">
+            <i class="fa-solid fa-plus"></i>
+            Agregar Nuevo Ejemplar
+        </a>
+    </div>
+
+    <div class="search-bar">
+        <div style="display:flex; flex-direction:column; gap:8px; width:100%">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select id="chip-field" class="search-input" style="width:160px">
+                <option value="global">Buscar en todo</option>
+                <option value="titulo">Título</option>
+                <option value="autor">Autor</option>
+                <option value="cota">Cota</option>
+            </select>
+            <input id="chip-input" type="text" class="search-input" placeholder="Escribe y presiona Enter para agregar filtro..." style="flex:1; min-width:240px">
+          </div>
+          <small style="color:var(--text-light)">Tip: usa el selector para agregar filtros por Título, Autor o Cota. Los filtros “Buscar en todo” viajan al servidor.</small>
+        <div id="chip-list" class="chip-list" ></div>
+        </div>
+        
+        <div class="filter-grid">
+            <div class="filter-item">
+                <select id="inv-tipo">
+                    <option value="">Tipo de Ítem: Todos los tipos</option>
+                    <!-- Ajusta los valores a los IDs reales de id_tipo_documento -->
+                    <option value="1">Libro</option>
+                    <option value="2">Tesis</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <select id="inv-estado">
+                    <option value="">Estado de Préstamo: Todos los estados</option>
+                    <option value="disponible">Disponible</option>
+                    <option value="prestado">Prestado</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <select id="inv-stock">
+                    <option value="">Nivel de Stock: Todos los niveles</option>
+                    <option value="0">Agotado</option>
+                    <option value="1-2">Bajo (1-2)</option>
+                    <option value=">=3">Alto (3+)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="results-section">
+        <p class="results-title">Resultados del Inventario</p>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Título</th>
+                        <th>Autor</th>
+                        <th>Ubicación</th>
+                        <th>Carrera</th>
+                        <th>Total</th>
+                        <th>Disponibles</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="inv-tbody">
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                        <i class="fa-solid fa-book"></i>
+                        <p>No hay resultados</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-actions" id="inv-summary"></div>
+    </div>
+
+<script>
+(function(){
+    const TOMSELECT_CSS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css';
+    const TOMSELECT_JS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js';
+    const LS_KEY_CATALOGS = 'inv_catalogs_v1';
+    let catalogsPromise = null;
+    let catalogsCache = null;
+
+    function ensureCss(href){
+      if(document.querySelector(`link[href="${href}"]`)) return;
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      document.head.appendChild(l);
+    }
+
+    function ensureScript(src){
+      return new Promise((resolve) => {
+        if(document.querySelector(`script[src="${src}"]`)) return resolve(true);
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      });
+    }
+
+    function readCatalogsFromLocalStorage(){
+      try{
+        const raw = localStorage.getItem(LS_KEY_CATALOGS);
+        if(!raw) return null;
+        const data = JSON.parse(raw);
+        if(!data || !Array.isArray(data.ubicaciones) || !Array.isArray(data.estados)) return null;
+        return data;
+      }catch(e){
+        return null;
+      }
+    }
+
+    function writeCatalogsToLocalStorage(data){
+      try{ localStorage.setItem(LS_KEY_CATALOGS, JSON.stringify(data)); }catch(e){}
+    }
+
+    async function fetchJson(url){
+      const resp = await fetch(url);
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.json();
+    }
+
+    async function loadCatalogs(){
+      if(catalogsCache) return catalogsCache;
+      const ls = readCatalogsFromLocalStorage();
+      if(ls){
+        catalogsCache = ls;
+        return catalogsCache;
+      }
+      if(!catalogsPromise){
+        catalogsPromise = (async ()=>{
+          const [ubicData, estData] = await Promise.all([
+            fetchJson('/api/ubicaciones/'),
+            fetchJson('/api/estados-ejemplar/'),
+          ]);
+          const ubicaciones = Array.isArray(ubicData) ? ubicData : (ubicData.results || []);
+          const estados = Array.isArray(estData) ? estData : (estData.results || []);
+          catalogsCache = {ubicaciones, estados};
+          writeCatalogsToLocalStorage(catalogsCache);
+          return catalogsCache;
+        })();
+      }
+      return catalogsPromise;
+    }
+
+    const chipField = document.getElementById('chip-field');
+    const chipInput = document.getElementById('chip-input');
+    const chipList = document.getElementById('chip-list');
+    const selTipo = document.getElementById('inv-tipo');
+    const selEstado = document.getElementById('inv-estado');
+    const selStock = document.getElementById('inv-stock');
+    const tbody = document.getElementById('inv-tbody');
+    const summary = document.getElementById('inv-summary');
+    let lastItems = [];
+    let lastResponse = null;
+    let chips = []; // {field:'global'|'titulo'|'autor'|'cota', value:string}
+    let draft = { field: null, value: '' };
+    let openMenuEl = null;
+
+  function unitBadge(n){
+    const cls = n === 0 ? 'red' : (n <= 2 ? 'yellow' : 'green');
+    const label = n === 1 ? '1 unidad' : `${n} unidades`;
+    return `<span class="unit-badge ${cls}">${label}</span>`;
+  }
+
+  function unitTotalBadge(n){
+    const cls = n === 0 ? 'red' : (n <= 2 ? 'yellow' : 'green');
+    const label = n === 1 ? '1 unidad' : `${n} unidades`;
+    return `<span class="unit-badge ${cls}">${label}</span>`;
+  }
+
+  function typeBadge(row){
+    const name = (row.tipo_nombre || `Tipo #${row.id_tipo_documento}`);
+    let color = String(row.tipo_nombre || '').toLowerCase() === 'libro' ? '2BB2F0' : '09369C';
+    return `<span class="type-badge" style="background-color:#${color}">${escapeHtml(name)}</span>`;
+  }
+
+  function autoresTexto(doc){
+    return (doc.autores||[]).map(a => `${a.nombre} ${a.apellido}`.trim()).join(', ');
+  }
+
+  function accionesCell(row){
+    const idDoc = row.id_documento;
+    const titulo = row.titulo || '';
+    const tomo = row.tomo;
+    const disp = parseInt(row.disponibles || 0, 10) || 0;
+    const prestarDisabled = disp <= 0;
+    const prestarStyle = prestarDisabled ? 'pointer-events:none; opacity:.55;' : '';
+    const prestarData = `data-id="${idDoc}" data-titulo="${escapeHtml(titulo)}" data-tomo="${escapeHtml(tomo ?? '')}" data-disponibles="${disp}"`;
+    return `
+      <div class="actions-menu" style="position:relative; display:inline-block;">
+        <button type="button" aria-label="acciones" class="btn-secondary" style="padding:6px 10px"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        <div class="menu" style="display:none; position:fixed; background:#fff; border:1px solid var(--border-color); border-radius:6px; min-width:180px; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,.12);">
+          <a href="#" data-action="prestar" ${prestarData} style="display:block; padding:8px 12px; ${prestarStyle}">Prestar</a>
+          <a href="#" data-action="editar" data-id="${idDoc}" data-tomo="${escapeHtml(tomo ?? '')}" style="display:block; padding:8px 12px;">Editar</a>
+          <a href="#" data-action="eliminar" data-id="${idDoc}" style="display:block; padding:8px 12px; color:#c00;">Eliminar documento</a>
+        </div>
+      </div>`;
+  }
+
+  function escapeHtml(v){
+    return String(v ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;')
+      .replace(/`/g,'&#96;');
+  }
+
+  async function fetchDocFull(idDocumento){
+    const resp = await fetch(`/api/documentos/?id_documento=${encodeURIComponent(idDocumento)}`);
+    if(!resp.ok) throw new Error('No se pudo cargar el documento');
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : (data.results || []);
+    return items[0] || null;
+  }
+
+  function normalizeTomo(v){
+    const s = String(v ?? '').trim();
+    return s ? s.toLowerCase() : '';
+  }
+
+  function findTomoIndex(doc, tomoValue){
+    if(!doc || !Array.isArray(doc.ejemplares) || !doc.ejemplares.length) return -1;
+    const tv = normalizeTomo(tomoValue);
+    if(!tv) return -1;
+    for(let i=0;i<doc.ejemplares.length;i++){
+      const group = doc.ejemplares[i] || [];
+      const t = group[0]?.tomo;
+      const tn = normalizeTomo(t);
+      if(tn === tv) return i;
+    }
+    return -1;
+  }
+
+  function wireMenus(rowEl){
+    const btn = rowEl.querySelector('.actions-menu > button');
+    const menu = rowEl.querySelector('.actions-menu .menu');
+
+    function closeMenu(){
+      if(openMenuEl) openMenuEl.style.display = 'none';
+      openMenuEl = null;
+    }
+
+    function positionMenu(){
+      if(!btn || !menu) return;
+      const margin = 8;
+      const r = btn.getBoundingClientRect();
+      menu.style.display = 'block';
+      menu.style.maxHeight = Math.max(160, window.innerHeight - margin*2) + 'px';
+      menu.style.overflowY = 'auto';
+      const mr = menu.getBoundingClientRect();
+      const fitsDown = (r.bottom + mr.height + margin) <= window.innerHeight;
+      const top = fitsDown ? r.bottom : Math.max(margin, r.top - mr.height);
+
+      let left = r.right - mr.width;
+      if(left < margin) left = margin;
+      if(left + mr.width + margin > window.innerWidth) left = Math.max(margin, window.innerWidth - mr.width - margin);
+
+      menu.style.top = top + 'px';
+      menu.style.left = left + 'px';
+    }
+
+    if(btn && menu){
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(openMenuEl && openMenuEl !== menu){
+          openMenuEl.style.display = 'none';
+        }
+        if(menu.style.display === 'block'){
+          closeMenu();
+          return;
+        }
+        openMenuEl = menu;
+        positionMenu();
+      });
+
+      if(!document.body.__invMenuWired){
+        document.body.__invMenuWired = true;
+        document.addEventListener('click', ()=>{ closeMenu(); });
+        window.addEventListener('resize', ()=>{ if(openMenuEl) { openMenuEl.style.display='none'; openMenuEl=null; } });
+        window.addEventListener('scroll', ()=>{ if(openMenuEl) { openMenuEl.style.display='none'; openMenuEl=null; } }, true);
+      }
+
+      menu.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const a = e.target.closest('a');
+        if(!a) return;
+        const action = a.getAttribute('data-action');
+        if(action === 'prestar'){
+          const disp = parseInt(a.getAttribute('data-disponibles') || '0', 10) || 0;
+          if(disp <= 0) return;
+          const id = a.getAttribute('data-id');
+          const titulo = a.getAttribute('data-titulo') || '';
+          const tomo = (a.getAttribute('data-tomo') || '').trim();
+          const params = new URLSearchParams();
+          if(id) params.set('id_documento', String(id));
+          if(titulo) params.set('titulo', titulo);
+          if(tomo) params.set('tomo', tomo);
+          window.location.href = `/prestamos/registrar/?${params.toString()}`;
+          return;
+        }
+
+        const id = a.getAttribute('data-id');
+        const tomo = a.getAttribute('data-tomo');
+        if(action === 'eliminar'){
+          const conf = await Swal.fire({icon:'warning', title:'Eliminar documento', text:'¿Desea eliminar este documento?', showCancelButton:true, confirmButtonText:'Sí, eliminar'});
+          if(conf.isConfirmed){
+            const resp = await fetch(`/api/documentos/${id}/delete`, {method:'DELETE'});
+            if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return;}
+            Swal.fire({icon:'success', title:'Eliminado'});
+            buscar();
+          }
+        } else if(action === 'editar'){
+          try{
+            const doc = await fetchDocFull(id);
+            if(!doc) return;
+            const idx = findTomoIndex(doc, tomo);
+            await verMas(doc, String(idx));
+          }catch(err){
+            Swal.fire({icon:'error', title:'Error', text:'No se pudo cargar el detalle del documento'});
+          }
+        }
+      });
+    }
+  }
+
+  function renderChips(){
+    chipList.innerHTML = chips.map((c, idx) => `
+      <span class="chip" title="${escapeHtml(c.field)}: ${escapeHtml(c.value)}">
+        <small class="chip-field" title="${escapeHtml(c.field)}">${escapeHtml(c.field)}</small>
+        <b class="chip-value" title="${escapeHtml(c.value)}">${escapeHtml(c.value)}</b>
+        <button type="button" data-idx="${idx}" class="chip-remove" aria-label="Eliminar filtro">×</button>
+      </span>
+    `).join('');
+    chipList.querySelectorAll('.chip-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = parseInt(btn.getAttribute('data-idx'),10);
+        chips.splice(i,1);
+        renderChips();
+        buscar();
+      });
+    });
+  }
+
+  chipInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      const val = chipInput.value.trim();
+      if(!val) return;
+      const field = chipField.value || 'global';
+      chips.push({field, value: val});
+      chipInput.value = '';
+      draft = {field:null, value:''};
+      renderChips();
+      buscar();
+    }
+  });
+
+  async function verMas(doc,tomo_position){
+    const tomoValor = tomo_position !== "-1" ? (doc.ejemplares[tomo_position][0]?.tomo ?? "") : "";
+    const esReadonly = tomo_position !== "-1" ? "readonly" : "";
+    const modalId = `inv-modal-${doc.id_documento}-${Date.now()}`;
+    const addBtnId = `${modalId}-addBtn`;
+    const cotaId = `${modalId}-cota`;
+    const tomoId = `${modalId}-tomo`;
+    const estadoId = `${modalId}-estado`;
+    const ubicId = `${modalId}-ubic`;
+    const cancelEditId = `${modalId}-cancelEdit`;
+
+    const addForm = `
+    <div style="margin-bottom:12px; padding:8px; border:1px dashed var(--border-color); border-radius:6px;">
+        <div style="font-weight:600; margin-bottom:6px;">Agregar ejemplar</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <input type="text" placeholder="Cota" id="${cotaId}" class="search-input" style="flex:1; min-width:140px;">
+        <input type="text" min="1" placeholder="Tomo" id="${tomoId}" class="search-input"  value="${tomoValor}" ${esReadonly} style="width:140px;">
+        <select id="${estadoId}" class="search-input" style="width:200px;"></select>
+        <select id="${ubicId}" class="search-input" style="width:260px;"></select>
+        <button type="button" id="${addBtnId}" class="btn-primary">Agregar</button>
+        <button type="button" id="${cancelEditId}" class="btn-secondary" style="display:none;">Cancelar</button>
+        </div>
+    </div>`;
+
+    const htmlEj = tomo_position !== '-1' ? (doc.ejemplares[tomo_position]||[]).map(ej => {
+      const tot = parseInt(ej.unidades_fisicas || 0, 10) || 0;
+      const disp = parseInt(ej.unidades_disponibles || 0, 10) || 0;
+      const units = Array.isArray(ej.unidades) ? ej.unidades : [];
+      const unitsHtml = units.map((u, idx) => {
+        const st = u && u.estado_prestamo ? String(u.estado_prestamo) : 'Prestado';
+        const cls = st.toLowerCase() === 'disponible' ? 'green' : 'red';
+        return `<span class="unit-badge ${cls}" style="margin-right:6px; margin-top:6px; display:inline-block;">${idx+1}: ${escapeHtml(st)}</span>`;
+      }).join('');
+      return `
+      <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; padding:10px; border:1px solid var(--border-color); border-radius:8px;">
+        <div style="flex:1;">
+          <div style="font-weight:600;">${ej.codigo_cota || 'Sin cota'}</div>
+          <div style="color:var(--text-light)">Ubicación: ${ej.ubicacion || 'Sin ubicación'}</div>
+          <div style="color:var(--text-light)">Estado físico: ${escapeHtml(ej.estado_fisico || ej.id_estado_ejemplar || 'Sin estado')}</div>
+          <div style="color:var(--text-light)">Disponibilidad: <b>${disp}</b> / ${tot}</div>
+          <div style="margin-top:6px;">${unitsHtml || ''}</div>
+        </div>
+        <div>
+          <button type="button" data-eid="${ej.id_ejemplar}" class="btn-secondary ej-editar">Editar</button>
+          <button type="button" data-eid="${ej.id_ejemplar}" class="btn-secondary ej-eliminar" style="margin-left:6px; color:#c00;">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('') : '<i>Sin ejemplares</i>';
+
+    let ubicTs = null;
+
+    function setEditing(ej){
+      editEid = ej ? ej.id_ejemplar : null;
+      const addBtn = document.getElementById(addBtnId);
+      const cancelBtn = document.getElementById(cancelEditId);
+
+      if(cancelBtn){
+        cancelBtn.addEventListener('click', ()=>{
+          setEditing(null);
+          const cotaEl = document.getElementById(cotaId);
+          if(cotaEl) cotaEl.value = '';
+          if(estadoTs) estadoTs.clear(true);
+          else if(estadoSelect) estadoSelect.value = '';
+          if(ubicTs) ubicTs.clear(true);
+          else if(ubicSelect) ubicSelect.value = '';
+        });
+      }
+
+      if(addBtn){
+        addBtn.addEventListener('click', async ()=>{
+          const cotaEl = document.getElementById(cotaId);
+          const tomoEl = document.getElementById(tomoId);
+
+          const payload = {
+            codigo_cota: (cotaEl||{}).value || null,
+            tomo: (tomoEl||{}).value || null,
+            unidad_fisica: 1,
+            id_estado_ejemplar: (estadoTs ? estadoTs.getValue() : (estadoSelect ? estadoSelect.value : '')),
+            id_ubicacion: (ubicTs ? ubicTs.getValue() : (ubicSelect ? ubicSelect.value : '')) || null,
+          };
+          if(!payload.id_estado_ejemplar){
+            Swal.fire({icon:'warning', title:'Estado requerido'}); return;
+          }
+
+          const url = editEid ? `/api/ejemplares/${editEid}` : `/api/documentos/${doc.id_documento}/ejemplares`;
+          const method = editEid ? 'PUT' : 'POST';
+
+          const resp = await fetch(url, {
+            method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+          });
+          if(!resp.ok){
+            const t = await resp.text().catch(()=> 'Error');
+            Swal.fire({icon:'error', title:'No se pudo guardar', text: t.substring(0,200)});
+            return;
+          }
+
+          Swal.fire({icon:'success', title: editEid ? 'Ejemplar actualizado' : 'Ejemplar agregado'});
+          setEditing(null);
+          buscar();
+        });
+      }
+
+      document.querySelectorAll('.ej-editar').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const eid = btn.getAttribute('data-eid');
+          const list = tomo_position !== '-1' ? (doc.ejemplares[tomo_position]||[]) : [];
+          const ej = list.find(x => String(x.id_ejemplar) === String(eid));
+          if(!ej) return;
+
+          const cotaEl = document.getElementById(cotaId);
+          const tomoEl = document.getElementById(tomoId);
+          if(cotaEl) cotaEl.value = ej.codigo_cota || '';
+          if(tomoEl && !tomoEl.hasAttribute('readonly')) tomoEl.value = ej.tomo || '';
+
+          if(estadoTs) estadoTs.setValue(String(ej.id_estado_ejemplar || ''), true);
+          else if(estadoSelect) estadoSelect.value = String(ej.id_estado_ejemplar || '');
+
+          if(ubicTs) ubicTs.setValue(String(ej.id_ubicacion || ''), true);
+          else if(ubicSelect) ubicSelect.value = String(ej.id_ubicacion || '');
+
+          setEditing(ej);
+        });
+      });
+
+      document.querySelectorAll('.ej-eliminar').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const eid = btn.getAttribute('data-eid');
+          const conf = await Swal.fire({icon:'warning', title:'Eliminar ejemplar', showCancelButton:true});
+          if(!conf.isConfirmed) return;
+          const resp = await fetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
+          if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return; }
+          Swal.fire({icon:'success', title:'Ejemplar eliminado'});
+          buscar();
+        });
+      });
+    }
+
+    async function setupSelects(){
+      const {ubicaciones, estados} = await loadCatalogs();
+      estadoSelect = document.getElementById(estadoId);
+      ubicSelect = document.getElementById(ubicId);
+
+      if(estadoSelect){
+        estadoSelect.innerHTML = `<option value="">Seleccione estado</option>` + estados.map(s => `<option value="${s.id_estado_ejemplar}">${s.nombre_estado}</option>`).join('');
+      }
+      if(ubicSelect){
+        ubicSelect.innerHTML = `<option value="">Seleccione ubicación</option>` + ubicaciones.map(u => `<option value="${u.id_ubicacion}">${u.descripcion_completa || ('Ubicación #' + u.id_ubicacion)}</option>`).join('');
+      }
+
+      ensureCss(TOMSELECT_CSS);
+      const loaded = await ensureScript(TOMSELECT_JS);
+      if(loaded && window.TomSelect){
+        if(estadoSelect){
+          estadoTs = new TomSelect(estadoSelect, {create:false, allowEmptyOption:true, placeholder:'Seleccione estado'});
+        }
+        if(ubicSelect){
+          ubicTs = new TomSelect(ubicSelect, {create:false, allowEmptyOption:true, placeholder:'Seleccione ubicación'});
+        }
+      } else {
+        const wireBasicFilter = (sel) => {
+          if(!sel) return;
+          sel.addEventListener('keydown', (e)=>{
+            if(e.key.length !== 1) return;
+            const ch = e.key.toLowerCase();
+            const opts = Array.from(sel.options);
+            const idx = opts.findIndex(o => (o.textContent||'').toLowerCase().includes(ch));
+            if(idx > 0) sel.selectedIndex = idx;
+          });
+        };
+        wireBasicFilter(estadoSelect);
+        wireBasicFilter(ubicSelect);
+      }
+    }
+
+    await Swal.fire({
+      title: doc.titulo,
+      html: `
+        <div style="text-align:left">
+            <div style= "text-align: center; margin-bottom:8px; color:var(--text-light)"> <b>Tomo:</b> ${tomo_position !== '-1' ? doc.ejemplares[tomo_position][0].tomo : 'Sin Tomo'} </div>
+            <div style="margin-bottom:8px; color:var(--text-light)"> ${autoresTexto(doc)} </div>
+
+            ${addForm}
+            <div class="ej-container">${htmlEj}</div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Cerrar',
+      didOpen: async () => {
+        await setupSelects();
+        setEditing(null);
+
+        const addBtn = document.getElementById(addBtnId);
+        const cancelBtn = document.getElementById(cancelEditId);
+
+        if(cancelBtn){
+          cancelBtn.addEventListener('click', ()=>{
+            setEditing(null);
+            const cotaEl = document.getElementById(cotaId);
+            if(cotaEl) cotaEl.value = '';
+            if(estadoTs) estadoTs.clear(true);
+            else if(estadoSelect) estadoSelect.value = '';
+            if(ubicTs) ubicTs.clear(true);
+            else if(ubicSelect) ubicSelect.value = '';
+          });
+        }
+
+        if(addBtn){
+          addBtn.addEventListener('click', async ()=>{
+            const cotaEl = document.getElementById(cotaId);
+            const tomoEl = document.getElementById(tomoId);
+
+            const payload = {
+              codigo_cota: (cotaEl||{}).value || null,
+              tomo: (tomoEl||{}).value || null,
+              unidad_fisica: 1,
+              id_estado_ejemplar: (estadoTs ? estadoTs.getValue() : (estadoSelect ? estadoSelect.value : '')),
+              id_ubicacion: (ubicTs ? ubicTs.getValue() : (ubicSelect ? ubicSelect.value : '')) || null,
+            };
+            if(!payload.id_estado_ejemplar){
+              Swal.fire({icon:'warning', title:'Estado requerido'}); return;
+            }
+
+            const url = editEid ? `/api/ejemplares/${editEid}` : `/api/documentos/${doc.id_documento}/ejemplares`;
+            const method = editEid ? 'PUT' : 'POST';
+
+            const resp = await fetch(url, {
+              method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+            });
+            if(!resp.ok){
+              const t = await resp.text().catch(()=> 'Error');
+              Swal.fire({icon:'error', title:'No se pudo guardar', text: t.substring(0,200)});
+              return;
+            }
+
+            Swal.fire({icon:'success', title: editEid ? 'Ejemplar actualizado' : 'Ejemplar agregado'});
+            setEditing(null);
+            buscar();
+          });
+        }
+
+        document.querySelectorAll('.ej-editar').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const eid = btn.getAttribute('data-eid');
+            const list = tomo_position !== '-1' ? (doc.ejemplares[tomo_position]||[]) : [];
+            const ej = list.find(x => String(x.id_ejemplar) === String(eid));
+            if(!ej) return;
+
+            const cotaEl = document.getElementById(cotaId);
+            const tomoEl = document.getElementById(tomoId);
+            if(cotaEl) cotaEl.value = ej.codigo_cota || '';
+            if(tomoEl && !tomoEl.hasAttribute('readonly')) tomoEl.value = ej.tomo || '';
+
+            if(estadoTs) estadoTs.setValue(String(ej.id_estado_ejemplar || ''), true);
+            else if(estadoSelect) estadoSelect.value = String(ej.id_estado_ejemplar || '');
+
+            if(ubicTs) ubicTs.setValue(String(ej.id_ubicacion || ''), true);
+            else if(ubicSelect) ubicSelect.value = String(ej.id_ubicacion || '');
+
+            setEditing(ej);
+          });
+        });
+
+        document.querySelectorAll('.ej-eliminar').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const eid = btn.getAttribute('data-eid');
+            const conf = await Swal.fire({icon:'warning', title:'Eliminar ejemplar', showCancelButton:true});
+            if(!conf.isConfirmed) return;
+            const resp = await fetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
+            if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return; }
+            Swal.fire({icon:'success', title:'Ejemplar eliminado'});
+            buscar();
+          });
+        });
+      }
+    });
+  }
+
+  function render(items){
+    const rows = items.map(r => {
+      const tomoLabel = r.tomo ? String(r.tomo) : 'Sin Tomo';
+      const disp = parseInt(r.disponibles || 0, 10) || 0;
+      const fis = parseInt(r.unidades_fisicas || 0, 10) || 0;
+      return `
+        <tr>
+          <td>${typeBadge(r)}</td>
+          <td>${escapeHtml(r.titulo || '')}<div style="color:var(--text-light); font-size:12px;"><b>Tomo:</b> ${escapeHtml(tomoLabel)}</div></td>
+          <td>${escapeHtml(r.autores || '')}</td>
+          <td>${escapeHtml(r.ubicacion || 'Sin ubicación')}</td>
+          <td>${escapeHtml(r.carrera_nombre || 'Sin carrera')}</td>
+          <td>${unitTotalBadge(fis)}</td>
+          <td>${unitBadge(disp)}</td>
+          <td>${accionesCell(r)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-book"></i><p>No hay resultados</p></td></tr>';
+    Array.from(tbody.querySelectorAll('tr')).forEach(wireMenus);
+  }
+
+  function renderPagination(resp){
+    const isPaged = resp && typeof resp === 'object' && Array.isArray(resp.results);
+    if(!isPaged){
+      summary.textContent = `Total: ${lastItems.length} fila(s)`;
+      return;
+    }
+    const count = resp.count ?? resp.results.length;
+    const next = resp.next;
+    const prev = resp.previous;
+    const showing = resp.results.length;
+    summary.innerHTML = `
+      <span>Total: ${count} fila(s) · mostrando ${showing}</span>
+      <div class="pagination">
+        <a href="#" class="inv-prev" style="${prev ? '' : 'pointer-events:none; opacity:.5;'}">Anterior</a>
+        <a href="#" class="inv-next" style="${next ? '' : 'pointer-events:none; opacity:.5;'}">Siguiente</a>
+      </div>
+    `;
+    summary.querySelector('.inv-prev').addEventListener('click', (e)=>{ e.preventDefault(); if(prev) buscar(prev); });
+    summary.querySelector('.inv-next').addEventListener('click', (e)=>{ e.preventDefault(); if(next) buscar(next); });
+  }
+
+  function buildParams(){
+    const params = new URLSearchParams();
+    params.set('mode', 'inventory');
+
+    const estado = (selEstado?.value || '').trim();
+    const stock = (selStock?.value || '').trim();
+    const tipo = (selTipo?.value || '').trim();
+
+    if(tipo) params.set('tipo_doc', tipo);
+    if(estado) params.set('inv_estado', estado);
+    if(stock) params.set('inv_stock', stock);
+
+    const qChips = chips.filter(c => c.field === 'global').map(c => c.value).join(' ').trim();
+    const qDraft = (draft.field === 'global' ? (draft.value || '').trim() : '').trim();
+    const q = [qChips, qDraft].filter(Boolean).join(' ').trim();
+    if(q) params.set('q', q);
+
+    chips.filter(c => c.field === 'titulo').forEach(c => params.append('titulo', c.value));
+    chips.filter(c => c.field === 'autor').forEach(c => params.append('autor', c.value));
+    chips.filter(c => c.field === 'cota').forEach(c => params.append('cota', c.value));
+
+    return params;
+  }
+
+  function setLoading(){
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-book"></i><p>Cargando...</p></td></tr>';
+  }
+
+  let t;
+  async function buscar(pageUrl){
+    setLoading();
+    try{
+      let url;
+      if(pageUrl){
+        const u = new URL(pageUrl, window.location.origin);
+        const baseParams = buildParams();
+        baseParams.forEach((v, k) => {
+          if(k === 'page') return;
+          u.searchParams.delete(k);
+        });
+        baseParams.forEach((v, k) => u.searchParams.append(k, v));
+        url = u.toString();
+      } else {
+        const params = buildParams();
+        url = `/api/documentos/?${params.toString()}`;
+      }
+
+      const resp = await fetch(url);
+      if(!resp.ok){
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-book"></i><p>No se pudo cargar</p></td></tr>';
+        return;
+      }
+      const data = await resp.json();
+      lastResponse = data;
+      const items = Array.isArray(data) ? data : (data.results || []);
+      lastItems = items;
+      render(items);
+      renderPagination(data);
+    }catch(e){
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-book"></i><p>Error cargando datos</p></td></tr>';
+    }
+  }
+
+  function onFilterChange(){
+    clearTimeout(t);
+    t = setTimeout(()=> buscar(), 300);
+  }
+
+  chipInput.addEventListener('input', () => {
+    draft.field = chipField.value || 'global';
+    draft.value = chipInput.value;
+    if(draft.field === 'global') onFilterChange();
+  });
+
+  chipField.addEventListener('change', () => {
+    draft.field = chipField.value || 'global';
+    onFilterChange();
+  });
+  if (selTipo) selTipo.addEventListener('change', onFilterChange);
+  if (selEstado) selEstado.addEventListener('change', onFilterChange);
+  if (selStock) selStock.addEventListener('change', onFilterChange);
+  renderChips();
+  buscar();
+})();
+</script>
+
+{% endblock %}

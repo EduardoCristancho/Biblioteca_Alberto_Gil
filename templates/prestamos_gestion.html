@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Préstamos{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <div>
+            <h1>Gestión de Préstamos</h1>
+            <p>Visualización histórica y gestión activa de registros de préstamos</p>
+        </div>
+        <a href="{% url 'registrar_prestamos' %}" class="btn-primary">
+            <i class="fa-solid fa-plus"></i>
+            Registrar Nuevo Préstamo
+        </a>
+    </div>
+
+    <div class="search-bar">
+        <div style="display:flex; flex-direction:column; gap:10px; width:100%">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <select id="loan-chip-field" class="search-input" style="width:180px">
+                    <option value="titulo">Título de Libro</option>
+                    <option value="autor">Autor</option>
+                    <option value="cota">Cota</option>
+                    <option value="usuario_id">ID de Usuario</option>
+                </select>
+                <input id="loan-chip-input" type="text" class="search-input" placeholder="Escribe y presiona Enter para agregar un filtro..." style="flex:1; min-width:240px">
+            </div>
+            <small style="color:var(--text-light)">
+                Tip: agrega múltiples filtros como chips. Todos los filtros se combinan con lógica AND.
+            </small>
+            <div id="loan-chip-list" class="chip-list"></div>
+
+            <div class="filter-grid" style="margin-top:2px">
+                <div class="filter-item">
+                    <select id="loan-estado">
+                        <option value="">Estado del Préstamo: Todos</option>
+                        <option value="activo">Activo</option>
+                        <option value="retrasado">Vencido</option>
+                        <option value="concluido">Concluido</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <select id="loan-tipo">
+                        <option value="">Tipo de Usuario: Todos</option>
+                        <option value="estudiante">Estudiante</option>
+                        <option value="profesor">Profesor</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <input type="date" id="loan-fecha-inicio">
+                    <small style="display:block; margin-top:5px; color:var(--text-light);">Fecha inicio</small>
+                </div>
+                <div class="filter-item">
+                    <input type="date" id="loan-fecha-fin">
+                    <small style="display:block; margin-top:5px; color:var(--text-light);">Fecha fin</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="results-section">
+        <p class="results-title">Historial de Préstamos</p>
+        <small id="loan-count" style="display: block; margin-bottom: 10px; color: var(--text-light);"></small>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 36%;">LIBRO(S) PRESTADO(S)</th>
+                        <th>USUARIO</th>
+                        <th>FECHA DE EJECUCIÓN</th>
+                        <th>ESTADO ACTUAL</th>
+                        <th>ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody id="loan-tbody">
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i class="fa-solid fa-handshake"></i>
+                            <p>Cargando...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-actions" id="loan-pagination"></div>
+    </div>
+
+<script>
+(function(){
+  const chipFieldEl = document.getElementById('loan-chip-field');
+  const chipInputEl = document.getElementById('loan-chip-input');
+  const chipListEl = document.getElementById('loan-chip-list');
+
+  const estadoEl = document.getElementById('loan-estado');
+  const tipoEl = document.getElementById('loan-tipo');
+  const fechaIniEl = document.getElementById('loan-fecha-inicio');
+  const fechaFinEl = document.getElementById('loan-fecha-fin');
+
+  const tbody = document.getElementById('loan-tbody');
+  const countEl = document.getElementById('loan-count');
+  const pagEl = document.getElementById('loan-pagination');
+
+  let chips = [];
+  let lastResponse = null;
+  let lastDocs = [];
+  let openMenu = null;
+
+  function normalizeText(v){
+    const s = String(v ?? '').trim().toLowerCase();
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  }
+
+  function chipLabel(field){
+    if(field === 'titulo') return 'Título';
+    if(field === 'autor') return 'Autor';
+    if(field === 'cota') return 'Cota';
+    if(field === 'usuario_id') return 'Usuario ID';
+    return field;
+  }
+
+  function renderChips(){
+    if(!chips.length){
+      chipListEl.innerHTML = '';
+      return;
+    }
+    chipListEl.innerHTML = chips.map((c, idx) => {
+      const safeVal = escapeHtml(c.value);
+      return `
+        <span class="chip" data-idx="${idx}">
+          <span class="chip-field">${chipLabel(c.field)}</span>
+          <span class="chip-value">${safeVal}</span>
+          <button type="button" class="chip-x" aria-label="Quitar">×</button>
+        </span>
+      `;
+    }).join('');
+    chipListEl.querySelectorAll('.chip').forEach(el => {
+      const idx = parseInt(el.getAttribute('data-idx'), 10);
+      el.querySelector('.chip-x').addEventListener('click', ()=>{
+        chips.splice(idx, 1);
+        renderChips();
+        fetchPrestamos();
+      });
+    });
+  }
+
+  function addChip(field, value){
+    const raw = String(value || '').trim();
+    if(!raw) return;
+    if(field === 'usuario_id' && !/^[0-9]+$/.test(raw)){
+      Swal.fire({icon:'warning', title:'ID inválido', text:'El ID de usuario debe ser numérico.', heightAuto:false});
+      return;
+    }
+
+    const key = field + '|' + normalizeText(raw);
+    const exists = chips.some(c => (c.field + '|' + normalizeText(c.value)) === key);
+    if(exists) return;
+    chips.push({field, value: raw});
+    renderChips();
+    fetchPrestamos();
+  }
+
+  function buildParams(){
+    const params = new URLSearchParams();
+    const estado = (estadoEl.value || '').trim();
+    const tipo = (tipoEl.value || '').trim();
+    const f1 = (fechaIniEl.value || '').trim();
+    const f2 = (fechaFinEl.value || '').trim();
+
+    if(estado) params.set('estado', estado);
+    if(tipo) params.set('tipo_usuario', tipo);
+    if(f1) params.set('fecha_inicio', f1);
+    if(f2) params.set('fecha_fin', f2);
+
+    chips.forEach(c => {
+      params.append(c.field, c.value);
+    });
+
+    return params;
+  }
+
+  function formatDate(iso){
+    if(!iso) return '';
+    const d = new Date(iso);
+    if(Number.isNaN(d.getTime())) return String(iso);
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yy = d.getFullYear();
+
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  function statusBadge(estado){
+    const e = String(estado || '').toLowerCase();
+    if(e === 'activo') return '<span class="status-badge activo">Activo</span>';
+    if(e === 'retrasado') return '<span class="status-badge vencido">Vencido</span>';
+    if(e === 'concluido') return '<span class="status-badge concluido">Concluido</span>';
+    return `<span class="status-badge">${estado || ''}</span>`;
+  }
+
+  function escapeHtml(v){
+    return String(v ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;')
+      .replace(/`/g,'&#96;');
+  }
+
+  function closeOpenMenu(){
+    if(openMenu){
+      openMenu.style.display = 'none';
+      openMenu = null;
+    }
+  }
+
+  document.addEventListener('click', ()=>{
+    closeOpenMenu();
+  });
+
+  window.addEventListener('scroll', ()=>{
+    closeOpenMenu();
+  }, true);
+
+  window.addEventListener('resize', ()=>{
+    closeOpenMenu();
+  });
+
+  function accionesCell(row){
+    const estado = String(row.estado || '').toLowerCase();
+    const isDone = estado === 'concluido' || estado === 'finalizado';
+    return `
+      <div class="actions-menu">
+        <button type="button" aria-label="Menú de opciones" class="btn-secondary loan-menu-btn" data-id="${row.id_prestamo}" style="padding:6px 10px">
+          <i class="fa-solid fa-ellipsis-vertical"></i>
+        </button>
+        <div class="menu" style="display:none; position: fixed;">
+          <a href="#" data-action="ver" data-id="${row.id_prestamo}">Ver Más</a>
+          <a href="#" data-action="editar" data-id="${row.id_prestamo}">Editar</a>
+          ${isDone ? '' : `<a href="#" data-action="concluir" data-id="${row.id_prestamo}">Concluir</a>`}
+          <a href="#" data-action="eliminar" data-id="${row.id_prestamo}" class="is-danger">Eliminar</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireMenu(rowEl){
+    const btn = rowEl.querySelector('.actions-menu .loan-menu-btn');
+    const menu = rowEl.querySelector('.actions-menu .menu');
+    if(!btn || !menu) return;
+
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(openMenu && openMenu !== menu){
+        openMenu.style.display = 'none';
+      }
+      const next = menu.style.display === 'block' ? 'none' : 'block';
+      menu.style.display = next;
+      openMenu = next === 'block' ? menu : null;
+
+      if(next === 'block'){
+        const rect = btn.getBoundingClientRect();
+
+        menu.style.left = `0px`;
+        menu.style.top = `0px`;
+        menu.style.maxHeight = '';
+
+        const w = menu.getBoundingClientRect().width;
+        const left = Math.round(Math.min(Math.max(rect.right - w, 8), window.innerWidth - w - 8));
+        menu.style.left = `${left}px`;
+
+        const viewportPad = 8;
+        const spaceBelow = window.innerHeight - rect.bottom - viewportPad;
+        const spaceAbove = rect.top - viewportPad;
+
+        const mh = menu.getBoundingClientRect().height;
+
+        if(spaceBelow >= mh || spaceBelow >= spaceAbove){
+          menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+          const maxH = Math.max(140, Math.floor(spaceBelow - 8));
+          menu.style.maxHeight = `${maxH}px`;
+        } else {
+          const maxH = Math.max(140, Math.floor(spaceAbove - 8));
+          menu.style.maxHeight = `${maxH}px`;
+          const h = menu.getBoundingClientRect().height;
+          menu.style.top = `${Math.max(viewportPad, Math.round(rect.top - h - 6))}px`;
+        }
+      }
+    });
+
+    menu.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const a = e.target.closest('a');
+      if(!a) return;
+      const action = a.getAttribute('data-action');
+      const id = parseInt(a.getAttribute('data-id'), 10);
+      const row = lastDocs.find(x => x.id_prestamo === id);
+      if(!row) return;
+      closeOpenMenu();
+
+      if(action === 'ver'){
+        const items = Array.isArray(row.items) ? row.items : [];
+        const obs = (row.observacion ?? '').toString().trim();
+        const obsHtml = obs ? `
+          <div style="margin-bottom:10px; padding:8px 10px; border:1px solid var(--border-color); border-radius:10px; background:#fff;">
+            <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">Observación</div>
+            <div style="white-space:pre-wrap;">${escapeHtml(obs)}</div>
+          </div>
+        ` : '';
+
+        const html = `
+          <div style="text-align:left">
+            <div style="margin-bottom:10px; color:var(--text-light)">
+              <b>Préstamo:</b> ${row.id_prestamo} · <b>Usuario:</b> ${row.id_usuario}
+            </div>
+            ${obsHtml}
+            <div style="border:1px solid var(--border-color); border-radius:10px; overflow:hidden;">
+              <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                  <tr style="background:var(--secondary-color);">
+                    <th style="text-align:left; padding:8px 10px; font-size:12px;">Título</th>
+                    <th style="text-align:left; padding:8px 10px; font-size:12px;">Cota</th>
+                    <th style="text-align:left; padding:8px 10px; font-size:12px;">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items.map(it => `
+                    <tr>
+                      <td style="padding:8px 10px; border-top:1px solid var(--border-color);">${escapeHtml(it.titulo || '')}</td>
+                      <td style="padding:8px 10px; border-top:1px solid var(--border-color);">${escapeHtml(it.codigo_cota || '')}${it.tomo ? ' · Tomo ' + escapeHtml(it.tomo) : ''}</td>
+                      <td style="padding:8px 10px; border-top:1px solid var(--border-color);">${it.estado_item === 'devuelto' ? 'Devuelto' : 'Activo'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+        Swal.fire({title: 'Detalle del préstamo', html, width: 900, heightAuto: false});
+        return;
+      }
+
+      if(action === 'editar'){
+        const initialDue = row.fecha_vencimiento_min ? String(row.fecha_vencimiento_min).slice(0,10) : '';
+        const currentObs = (row.observacion ?? '').toString();
+        const isWide = window.matchMedia('(min-width: 720px)').matches;
+        const gridCols = isWide ? '1fr 1fr' : '1fr';
+
+        const res = await Swal.fire({
+          icon:'info',
+          title:`Editar préstamo #${id}`,
+          html:`
+            <div style="text-align:left">
+              <div class="loan-edit-grid" style="display:grid; grid-template-columns:${gridCols}; gap:10px; align-items:end;">
+                <div>
+                  <label style="display:block; font-size:12px; color:var(--text-light); margin-bottom:6px;">Nueva fecha de vencimiento</label>
+                  <input id="sw-due" type="date" class="swal2-input" style="width:100%; margin:0" value="${escapeHtml(initialDue)}">
+                </div>
+                <div>
+                  <label style="display:block; font-size:12px; color:var(--text-light); margin-bottom:6px;">Estado actual</label>
+                  <input type="text" class="swal2-input" style="width:100%; margin:0" value="${escapeHtml(row.estado || '')}" readonly>
+                </div>
+                <div style="grid-column:1 / -1;">
+                  <label style="display:block; font-size:12px; color:var(--text-light); margin:10px 0 6px;">Observación</label>
+                  <textarea id="sw-obs" class="swal2-textarea" style="width:100%; margin:0"></textarea>
+                </div>
+              </div>
+            </div>
+          `,
+          showCancelButton:true,
+          confirmButtonText:'Guardar',
+          heightAuto:false,
+          customClass: { htmlContainer: 'loan-swal-body' },
+          didOpen: () => {
+            const el = document.getElementById('sw-obs');
+            if(el) el.value = currentObs;
+          },
+          preConfirm: () => {
+            const due = document.getElementById('sw-due').value;
+            const obs = document.getElementById('sw-obs').value;
+            if(!due) {
+              Swal.showValidationMessage('La fecha de vencimiento es requerida');
+              return false;
+            }
+            return {due, obs};
+          }
+        });
+
+        if(!res.isConfirmed) return;
+        try{
+          const payload = {fecha_vencimiento: res.value.due, observacion: res.value.obs};
+          const resp = await fetch(`/api/prestamo/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          if(!resp.ok){
+            const t = await resp.text().catch(()=> 'Error');
+            Swal.fire({icon:'error', title:'No se pudo actualizar', text: t.substring(0,200), heightAuto:false});
+            return;
+          }
+          Swal.fire({icon:'success', title:'Actualizado', heightAuto:false});
+          fetchPrestamos();
+        }catch(e){
+          Swal.fire({icon:'error', title:'Error', text:'No se pudo completar la operación', heightAuto:false});
+        }
+        return;
+      }
+
+      if(action === 'concluir'){
+        const estado = String(row.estado || '').toLowerCase();
+        if(estado === 'concluido' || estado === 'finalizado'){
+          Swal.fire({icon:'info', title:'Ya concluido', text:'Este préstamo ya está concluido.', heightAuto:false});
+          return;
+        }
+
+        const res = await Swal.fire({
+          icon:'warning',
+          title:`Concluir préstamo #${id}`,
+          html:`
+            <div style="text-align:left">
+              <div style="color:var(--text-light); font-size:13px; margin-bottom:8px;">Se marcarán como devueltos los ítems abiertos.</div>
+              <label style="display:block; font-size:12px; color:var(--text-light); margin-bottom:6px;">Observación de cierre</label>
+              <textarea id="sw-close-obs" class="swal2-textarea" style="width:100%; margin:0" placeholder="Opcional"></textarea>
+            </div>
+          `,
+          showCancelButton:true,
+          confirmButtonText:'Concluir',
+          heightAuto:false,
+          customClass: { htmlContainer: 'loan-swal-body' },
+          preConfirm: () => {
+            const obs = document.getElementById('sw-close-obs').value;
+            return {obs};
+          }
+        });
+
+        if(!res.isConfirmed) return;
+        try{
+          const payload = {observacion: res.value.obs};
+          const resp = await fetch(`/api/prestamo/${id}/concluir`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          if(!resp.ok){
+            const t = await resp.text().catch(()=> 'Error');
+            Swal.fire({icon:'error', title:'No se pudo concluir', text: t.substring(0,200), heightAuto:false});
+            return;
+          }
+          Swal.fire({icon:'success', title:'Préstamo concluido', heightAuto:false});
+          fetchPrestamos();
+        }catch(e){
+          Swal.fire({icon:'error', title:'Error', text:'No se pudo completar la operación', heightAuto:false});
+        }
+        return;
+      }
+
+      if(action === 'eliminar'){
+        const conf = await Swal.fire({icon:'warning', title:`Eliminar préstamo #${id}`, text:'Esta acción eliminará el préstamo y sus detalles.', showCancelButton:true, confirmButtonText:'Sí, eliminar', heightAuto:false});
+        if(!conf.isConfirmed) return;
+        try{
+          const resp = await fetch(`/api/prestamo/${id}`, {method:'DELETE'});
+          if(!resp.ok){
+            const t = await resp.text().catch(()=> 'Error');
+            Swal.fire({icon:'error', title:'No se pudo eliminar', text: t.substring(0,200), heightAuto:false});
+            return;
+          }
+          Swal.fire({icon:'success', title:'Eliminado', heightAuto:false});
+          fetchPrestamos();
+        }catch(e){
+          Swal.fire({icon:'error', title:'Error', text:'No se pudo completar la operación', heightAuto:false});
+        }
+      }
+    });
+  }
+
+  function renderTable(rows){
+    if(!rows.length){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="empty-state">
+            <i class="fa-solid fa-handshake"></i>
+            <p>No hay resultados</p>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => {
+      const items = Array.isArray(r.items) ? r.items : [];
+      const resumen = items.length ? (items.length === 1 ? '1 Libro' : `${items.length} Libros`) : '0 Libros';
+      const first = items[0];
+      const titulo = first?.titulo || '(Sin título)';
+      const cota = first?.codigo_cota || '';
+      const extra = items.length > 1 ? ` +${items.length - 1} más` : '';
+      const userName = [r.usuario_nombre, r.usuario_apellido].filter(Boolean).join(' ').trim() || `Usuario #${r.id_usuario}`;
+      const userTipo = r.usuario_tipo || '';
+      const userTipoColor = (String(userTipo).toLowerCase().includes('prof') ? '#8a2be2' : 'var(--primary-color)');
+
+      return `
+        <tr data-id="${r.id_prestamo}">
+          <td>
+            <strong>${titulo}${extra}</strong>
+            <br><small style="color: var(--text-light);">${cota ? ('Cota: ' + cota) : ''} · ${resumen}</small>
+          </td>
+          <td>
+            <strong>${userName}</strong>
+            <br><span style="font-size: 11px; font-weight: 500; color: ${userTipoColor};">${userTipo || ''}</span>
+          </td>
+          <td>${formatDate(r.fecha_prestamo)}</td>
+          <td>${statusBadge(r.estado)}</td>
+          <td style="white-space:nowrap;">${accionesCell(r)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('tr').forEach(tr => wireMenu(tr));
+  }
+
+  function renderPagination(resp){
+    const isPaged = resp && typeof resp === 'object' && Array.isArray(resp.results);
+    if(!isPaged){
+      pagEl.innerHTML = '';
+      return;
+    }
+
+    const count = resp.count ?? resp.results.length;
+    const next = resp.next;
+    const prev = resp.previous;
+    const showing = resp.results.length;
+    pagEl.innerHTML = `
+      <span>Mostrando ${showing} de ${count} registros</span>
+      <div class="pagination">
+        <a href="#" class="loan-prev" style="${prev ? '' : 'pointer-events:none; opacity:.5;'}">Anterior</a>
+        <a href="#" class="loan-next" style="${next ? '' : 'pointer-events:none; opacity:.5;'}">Siguiente</a>
+      </div>
+    `;
+    pagEl.querySelector('.loan-prev').addEventListener('click', (e)=>{ e.preventDefault(); fetchPrestamos(prev); });
+    pagEl.querySelector('.loan-next').addEventListener('click', (e)=>{ e.preventDefault(); fetchPrestamos(next); });
+  }
+
+  async function fetchPrestamos(pageUrl){
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-state">
+          <i class="fa-solid fa-spinner"></i>
+          <p>Cargando...</p>
+        </td>
+      </tr>
+    `;
+    try{
+      let url;
+      if(pageUrl){
+        const u = new URL(pageUrl, window.location.origin);
+        const baseParams = buildParams();
+        baseParams.forEach((v, k) => {
+          if(k === 'page') return;
+          u.searchParams.delete(k);
+        });
+        baseParams.forEach((v, k) => u.searchParams.append(k, v));
+        url = u.toString();
+      } else {
+        const params = buildParams();
+        url = `/api/prestamo?${params.toString()}`;
+      }
+
+      const resp = await fetch(url);
+      if(!resp.ok){
+        const t = await resp.text().catch(()=> 'Error');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="empty-state">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <p>No se pudo cargar: ${t.substring(0,120)}</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      const data = await resp.json();
+      lastResponse = data;
+      const rows = Array.isArray(data) ? data : (data.results || []);
+      lastDocs = rows;
+      const totalCount = Array.isArray(data) ? rows.length : (data.count ?? rows.length);
+      countEl.textContent = `${totalCount} registro(s) encontrado(s)`;
+      renderTable(rows);
+      renderPagination(data);
+    }catch(e){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="empty-state">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <p>Error cargando datos</p>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  let t;
+  chipInputEl.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    addChip(chipFieldEl.value, chipInputEl.value);
+    chipInputEl.value = '';
+  });
+
+  function onFilterChange(){
+    clearTimeout(t);
+    t = setTimeout(()=> fetchPrestamos(), 150);
+  }
+
+  estadoEl.addEventListener('change', onFilterChange);
+  tipoEl.addEventListener('change', onFilterChange);
+  fechaIniEl.addEventListener('change', onFilterChange);
+  fechaFinEl.addEventListener('change', onFilterChange);
+
+  renderChips();
+  fetchPrestamos();
+})();
+</script>
+{% endblock %}

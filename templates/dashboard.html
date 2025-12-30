@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Principal{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <div>
+            <h1>Dashboard Principal</h1>
+            <p>Vista general del estado operativo de la biblioteca</p>
+        </div>
+        <a href="{% url 'registrar_prestamos' %}" class="btn-primary">
+            <i class="fa-solid fa-plus"></i>
+            Crear Nuevo Préstamo
+        </a>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Total de Ítems Físicos</p>
+                <i class="fa-solid fa-file blue"></i>
+            </div>
+            <h2>12,847</h2>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Préstamos Activos</p>
+                <i class="fa-solid fa-check green"></i>
+            </div>
+            <h2>2,156</h2>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Libros Vencidos</p>
+                <i class="fa-solid fa-triangle-exclamation red"></i>
+            </div>
+            <h2>47</h2>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Usuarios Registrados</p>
+                <i class="fa-solid fa-users purple"></i>
+            </div>
+            <h2>3,892</h2>
+        </div>
+    </div>
+
+    <div class="main-sections">
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-clock-rotate-left red"></i>
+                Préstamos Vencidos
+            </div>
+            <p style="font-size: 14px; color: var(--status-red); margin-bottom: 10px;">Acción crítica requerida</p>
+            <div class="item-list">
+                <div class="list-item">
+                    <div class="item-info">
+                        <p>El Quijote de la Mancha</p>
+                        <p>María González</p>
+                    </div>
+                    <span class="days-badge">15 días</span>
+                </div>
+                <div class="list-item">
+                    <div class="item-info">
+                        <p>Cien Años de Soledad</p>
+                        <p>Carlos Rodríguez</p>
+                    </div>
+                    <span class="days-badge">12 días</span>
+                </div>
+                <div class="list-item">
+                    <div class="item-info">
+                        <p>1984</p>
+                        <p>Ana López</p>
+                    </div>
+                    <span class="days-badge">8 días</span>
+                </div>
+                <div class="list-item">
+                    <div class="item-info">
+                        <p>El Principito</p>
+                        <p>Pedro Martín</p>
+                    </div>
+                    <span class="days-badge">5 días</span>
+                </div>
+                <div class="list-item">
+                    <div class="item-info">
+                        <p>La Casa de Bernarda Alba</p>
+                        <p>Elena Jiménez</p>
+                    </div>
+                    <span class="days-badge">3 días</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-warehouse orange"></i>
+                Inventario Crítico
+            </div>
+            <p style="font-size: 14px; color: var(--status-orange); margin-bottom: 10px;">Stock agotado</p>
+            <div class="item-list">
+                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                    <div class="item-info">
+                        <p>Rayuela</p>
+                        <p>Julio Cortázar</p>
+                    </div>
+                    <span class="unavailable-badge">0 disponibles</span>
+                </div>
+                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                    <div class="item-info">
+                        <p>Matar a un Ruiseñor</p>
+                        <p>Harper Lee</p>
+                    </div>
+                    <span class="unavailable-badge">0 disponibles</span>
+                </div>
+                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                    <div class="item-info">
+                        <p>El Aleph</p>
+                        <p>Jorge Luis Borges</p>
+                    </div>
+                    <span class="unavailable-badge">0 disponibles</span>
+                </div>
+                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                    <div class="item-info">
+                        <p>Ficciones</p>
+                        <p>Jorge Luis Borges</p>
+                    </div>
+                    <span class="unavailable-badge">0 disponibles</span>
+                </div>
+                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                    <div class="item-info">
+                        <p>Crónica de una Muerte Anunciada</p>
+                        <p>Gabriel García Márquez</p>
+                    </div>
+                    <span class="unavailable-badge">0 disponibles</span>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

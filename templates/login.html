@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión | Biblioteca Alberto Gil</title>
+    
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="library-logo">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Biblioteca Alberto Gil</span>
+            </div>
+            <p>Iniciar Sesión en el Sistema Bibliotecario</p>
+        </div>
+
+        <div class="login-card">
+            {% if error %}
+            <div class="alert-error">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+            
+            <form action="{% url 'login' %}" method="POST">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="username">Nombre de Usuario o Email</label>
+                    <div class="login-input-group">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="username" name="username" placeholder="Ingrese su usuario o email" value="{{ username|default:'' }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña</label>
+                    <div class="login-input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="Ingrese su contraseña">
+                        <span class="toggle-password"><i class="fa-solid fa-eye-slash"></i></span>
+                    </div>
+                </div>
+
+                <div class="login-options">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="rememberMe">
+                        <label for="rememberMe">Recordarme</label>
+                    </div>
+                    <a href="#" class="forgot-password">¿Olvidó su contraseña?</a>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    Iniciar Sesión
+                </button>
+            </form>
+        </div>
+
+        <footer class="login-footer">
+            Sistema de Gestión Bibliotecaria © 2024
+            <div style="margin-top: 15px; padding: 10px; background-color: rgba(79, 91, 213, 0.1); border-radius: 8px; font-size: 12px;">
+                <strong>Usuarios de prueba:</strong><br>
+                Usuario: <code style="background-color: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">admin</code> / Contraseña: <code style="background-color: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">admin123</code><br>
+                Usuario: <code style="background-color: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">bibliotecario</code> / Contraseña: <code style="background-color: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">biblio123</code>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

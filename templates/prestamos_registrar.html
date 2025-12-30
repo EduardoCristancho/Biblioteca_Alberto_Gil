@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Nuevo Préstamo{% endblock %}
+
+{% block content %}
+    <div class="form-header">
+        <a href="{% url 'gestion_prestamos' %}">
+            <i class="fa-solid fa-arrow-left"></i>
+            Registrar Nuevo Préstamo
+        </a>
+        <p>Complete los datos del usuario y seleccione los libros a prestar</p>
+    </div>
+
+    <div class="form-layout">
+        <div class="form-card">
+            <div class="form-section-title">
+                <i class="fa-solid fa-user"></i>
+                Identificación del Usuario
+            </div>
+            
+            <div class="form-group search-input-group">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="input-cedula" type="text" placeholder="Ingrese cédula o ID del usuario...">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha-inicio">Fecha de Ejecución</label>
+                    <input type="date" id="fecha-inicio" value="2025-11-10">
+                </div>
+                <div class="form-group">
+                    <label for="fecha-limite">Fecha Límite de Devolución</label>
+                    <input type="date" id="fecha-limite" value="2025-11-24">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="form-section-title">
+                <i class="fa-solid fa-book-open-reader"></i>
+                Gestión de Libros del Préstamo
+            </div>
+
+            <div class="form-group search-input-group">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="input-busqueda" type="text" placeholder="Buscar por título, cota o autor...">
+            </div>
+
+            <div id="resultado-libros" class="book-search-results"></div>
+
+            <div class="form-section-title" style="margin-top: 30px;">Libros a Prestar</div>
+            <div class="table-container loan-list-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Cota</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seleccionados-body">
+                        <tr>
+                            <td colspan="3" class="empty-state">
+                                <i class="fa-solid fa-book-skull"></i>
+                                <p>No hay libros seleccionados</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="form-actions" style="margin-top: 20px; border-top: none;">
+                <button type="button" id="btn-cancelar" class="btn-secondary">Cancelar</button>
+                <button type="button" id="btn-confirmar" class="btn-confirm">Confirmar Préstamo</button>
+            </div>
+        </div>
+    </div>
+    <script>
+(function(){
+  const inputBusqueda = document.getElementById('input-busqueda');
+  const resultado = document.getElementById('resultado-libros');
+  const tbodySel = document.getElementById('seleccionados-body');
+  const btnConfirmar = document.getElementById('btn-confirmar');
+  const btnCancelar = document.getElementById('btn-cancelar');
+  const inputCedula = document.getElementById('input-cedula');
+  const inputFechaLimite = document.getElementById('fecha-limite');
+
+  let seleccionados = []; // {id_ejemplar, titulo, cota}
+  let prefill = { id_documento: null, titulo: null, tomo: null };
+
+  function normalizeText(v){
+    const s = String(v ?? '').trim().toLowerCase();
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  }
+
+  function readPrefill(){
+    try{
+      const params = new URLSearchParams(window.location.search || '');
+      const id = (params.get('id_documento') || '').trim();
+      const titulo = (params.get('titulo') || '').trim();
+      const tomo = (params.get('tomo') || '').trim();
+      prefill = {
+        id_documento: id && /^\d+$/.test(id) ? parseInt(id, 10) : null,
+        titulo: titulo || null,
+        tomo: tomo || null,
+      };
+    }catch(e){
+      prefill = { id_documento: null, titulo: null, tomo: null };
+    }
+  }
+
+  function renderSeleccionados(){
+    if(seleccionados.length === 0){
+      tbodySel.innerHTML = '<tr><td colspan="3" class="empty-state"><i class="fa-solid fa-book-skull"></i><p>No hay libros seleccionados</p></td></tr>';
+      return;
+    }
+    tbodySel.innerHTML = '';
+    seleccionados.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.titulo}</td>
+        <td>${item.cota || ''}</td>
+        <td><button type="button" data-idx="${idx}" class="btn-secondary">Quitar</button></td>
+      `;
+      tr.querySelector('button').addEventListener('click', () => {
+        seleccionados.splice(idx,1);
+        renderSeleccionados();
+      });
+      tbodySel.appendChild(tr);
+    });
+  }
+
+  async function buscar(q){
+    if(!q || q.trim().length < 2){
+      resultado.innerHTML = '';
+      return;
+    }
+    try{
+      const resp = await fetch(`/api/documentos/?q=${encodeURIComponent(q)}`);
+      if(!resp.ok) throw new Error('Error buscando documentos');
+      const data = await resp.json();
+      console.log(data);
+      const items = Array.isArray(data) ? data : (data.results || []);
+      renderResultados(items);
+    }catch(err){
+      console.error(err);
+      resultado.innerHTML = '';
+    }
+  }
+
+  async function buscarById(idDocumento){
+    try{
+      const resp = await fetch(`/api/documentos/?id_documento=${encodeURIComponent(idDocumento)}`);
+      if(!resp.ok) throw new Error('Error buscando documento');
+      const data = await resp.json();
+      const items = Array.isArray(data) ? data : (data.results || []);
+      renderResultados(items);
+    }catch(err){
+      console.error(err);
+      resultado.innerHTML = '';
+    }
+  }
+
+function renderResultados(docs) {
+  const contenedor = resultado;
+  contenedor.innerHTML = '';
+
+  if (!docs || docs.length === 0) {
+    contenedor.innerHTML = '<div class="results-empty">No se encontraron resultados.</div>';
+    return;
+  }
+
+  docs.forEach(doc => {
+    const autores = (doc.autores || []).map(a => `${a.nombre} ${a.apellido}`.trim()).filter(Boolean).join(', ');
+    const ejemplaresFlat = (doc.ejemplares || []).flat();
+    const disponibles = ejemplaresFlat.filter(e => !!e.disponible).length;
+    const total = ejemplaresFlat.length;
+
+    // Agrupar por tomo (mantiene categorización)
+    const ejemplaresPorTomo = {};
+    ejemplaresFlat.forEach(ej => {
+      const t = ej.tomo || 'Único / Sin Tomo';
+      if (!ejemplaresPorTomo[t]) ejemplaresPorTomo[t] = [];
+      ejemplaresPorTomo[t].push(ej);
+    });
+
+    const card = document.createElement('div');
+    card.className = 'doc-card';
+    card.innerHTML = `
+      <div class="doc-card-head">
+        <div class="doc-head-row">
+          <span class="doc-badge">${doc.tipo_nombre || 'Documento'}</span>
+          <span class="doc-count">${disponibles}/${total} disponibles</span>
+        </div>
+        <div class="doc-title" title="${doc.titulo || ''}">${doc.titulo || ''}</div>
+        <div class="doc-sub">
+          <span class="doc-sub-item">${autores || 'Autor desconocido'}</span>
+          <span class="doc-sub-sep">·</span>
+          <span class="doc-sub-item">${doc.carrera_nombre || 'General'}</span>
+        </div>
+      </div>
+
+      <details class="doc-details">
+        <summary>
+          <span>Ejemplares por tomo</span>
+          <span class="doc-details-meta">${Object.keys(ejemplaresPorTomo).length} tomos</span>
+        </summary>
+        <div class="doc-details-body">
+          <div class="tomo-list"></div>
+        </div>
+      </details>
+    `;
+
+    const tomoList = card.querySelector('.tomo-list');
+    const docDetails = card.querySelector('.doc-details');
+
+    Object.entries(ejemplaresPorTomo).forEach(([tomo, copias]) => {
+      const tomoDisponibles = copias.filter(e => !!e.disponible).length;
+      const tomoTotal = copias.length;
+
+      const tomoNorm = normalizeText(tomo);
+      const targetTomoNorm = prefill.tomo ? normalizeText(prefill.tomo) : '';
+
+      const tomoDetails = document.createElement('details');
+      tomoDetails.className = 'tomo-details';
+      tomoDetails.innerHTML = `
+        <summary>
+          <span class="tomo-title">${tomo}</span>
+          <span class="tomo-meta">${tomoDisponibles}/${tomoTotal}</span>
+        </summary>
+        <div class="tomo-body">
+          <div class="ej-list"></div>
+        </div>
+      `;
+
+      const ejList = tomoDetails.querySelector('.ej-list');
+      copias.forEach(ej => {
+        const yaAgregado = seleccionados.some(x => x.id_ejemplar === ej.id_ejemplar);
+        const row = document.createElement('div');
+        row.className = 'ej-row' + (!ej.disponible ? ' is-disabled' : '');
+        row.innerHTML = `
+          <div class="ej-left">
+            <span class="ej-dot ${ej.disponible ? 'ok' : 'no'}"></span>
+            <span class="ej-cota">${ej.codigo_cota || 'N/A'}</span>
+            <span class="ej-ubic">${ej.ubicacion || ''}</span>
+          </div>
+          <div class="ej-right">
+            ${yaAgregado ? '<span class="ej-added">Agregado</span>' : '<button type="button" class="ej-btn" ' + (!ej.disponible ? 'disabled' : '') + '>Añadir</button>'}
+          </div>
+        `;
+        const btn = row.querySelector('.ej-btn');
+        if (btn && ej.disponible) {
+          btn.addEventListener('click', () => {
+            if (seleccionados.some(x => x.id_ejemplar === ej.id_ejemplar)) {
+              Swal.fire({icon:'info', title:'Ya agregado', text:'Este ejemplar ya está en la lista.'});
+              return;
+            }
+            seleccionados.push({ id_ejemplar: ej.id_ejemplar, titulo: doc.titulo, cota: ej.codigo_cota });
+            renderSeleccionados();
+            renderResultados(docs);
+          });
+        }
+        ejList.appendChild(row);
+      });
+
+      if(prefill.tomo && targetTomoNorm && tomoNorm === targetTomoNorm){
+        tomoDetails.open = true;
+        const sum = tomoDetails.querySelector('summary');
+        if(sum) sum.style.outline = '2px solid var(--primary-color)';
+      }
+
+      if(prefill.tomo && targetTomoNorm && tomoNorm !== targetTomoNorm){
+        tomoDetails.open = false;
+      }
+
+      tomoList.appendChild(tomoDetails);
+    });
+
+    if(docDetails && prefill.tomo){
+      docDetails.open = true;
+    }
+
+    contenedor.appendChild(card);
+
+    if(prefill.tomo){
+      const target = card.querySelector('.tomo-details[open] summary');
+      if(target) setTimeout(()=>{ try{ target.scrollIntoView({block:'nearest'}); }catch(e){} }, 0);
+    }
+  });
+}
+
+  let t;
+  inputBusqueda.addEventListener('input', (e) => {
+    clearTimeout(t);
+    t = setTimeout(() => buscar(e.target.value), 300);
+  });
+
+  readPrefill();
+  if(prefill.titulo){
+    inputBusqueda.value = prefill.titulo;
+  }
+  if(prefill.id_documento){
+    buscarById(prefill.id_documento);
+  } else if(prefill.titulo && prefill.titulo.trim().length >= 2){
+    buscar(prefill.titulo);
+  }
+
+  btnCancelar.addEventListener('click', () => {
+    seleccionados = [];
+    renderSeleccionados();
+  });
+
+  btnConfirmar.addEventListener('click', async () => {
+    const fechaVenc = inputFechaLimite.value;
+    const idUser = inputCedula.value.trim();
+    if(!fechaVenc){
+      Swal.fire({icon:'warning', title:'Fecha requerida', text:'Debe indicar la fecha límite de devolución.'});
+      return;
+    }
+    if(seleccionados.length === 0){
+      Swal.fire({icon:'warning', title:'Sin libros', text:'Agregue al menos un ejemplar para prestar.'});
+      return;
+    }
+    if(!idUser){
+      Swal.fire({icon:'warning', title:'Usuario requerido', text:'Ingrese la cédula/ID del usuario.'});
+      return;
+    }
+    const payload = {
+      id_user: idUser,
+      fecha_vencimiento: fechaVenc,
+      ejemplares: seleccionados.map(x => ({id_ejemplar: x.id_ejemplar}))
+    };
+
+    try{
+      const resp = await fetch('/api/prestamo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(resp.status === 404){
+        const rj = await resp.json().catch(()=>({detail:'No encontrado'}));
+        Swal.fire({icon:'error', title:'Usuario no encontrado', text:rj.detail || 'El id ingresado no coincide con ningún estudiante o profesor.'});
+        return;
+      }
+      if(!resp.ok){
+        const rj = await resp.json().catch(()=>({detail:'Error'}));
+        throw new Error(rj.detail || 'Error al registrar préstamo');
+      }
+      const ok = await resp.json();
+      Swal.fire({icon:'success', title:'Préstamo registrado', text:`ID: ${ok.id_prestamo}`});
+      seleccionados = [];
+      renderSeleccionados();
+    }catch(err){
+      Swal.fire({icon:'error', title:'Error', text: err.message});
+    }
+  });
+
+  renderSeleccionados();
+})();
+</script>
+{% endblock %}
+

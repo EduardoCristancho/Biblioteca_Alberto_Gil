@@ -2,11 +2,12 @@ from django.contrib.auth.models import User, Permission
 from django.contrib.auth.hashers import make_password
 from django.core.validators import RegexValidator
 from django.db import transaction
+import unicodedata
 from rest_framework import serializers
 
 from .models import (
     Documentos, Ejemplares, Autores, Ubicaciones, Carreras, TipoDocumento,
-    Usuarios, EstadosEjemplar
+    Usuarios, EstadosEjemplar, LibroDetalle, DocumentoAcademico
 )
 
 
@@ -86,6 +87,12 @@ class UbicacionSerializer(serializers.ModelSerializer):
         fields = ['id_ubicacion', 'pasillo', 'estante', 'descripcion_completa']
 
 
+class EstadoEjemplarSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EstadosEjemplar
+        fields = ['id_estado_ejemplar', 'nombre_estado']
+
+
 class CarreraSerializer(serializers.ModelSerializer):
     class Meta:
         model = Carreras
@@ -98,16 +105,18 @@ class DocumentoCreateSerializer(serializers.Serializer):
     id_tipo_documento = serializers.PrimaryKeyRelatedField(queryset=TipoDocumento.objects.all())
     fecha_publicacion = serializers.DateField(required=False, allow_null=True)
 
-    autores = serializers.ListField(child=serializers.CharField(), allow_empty=False)
+    autores = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    autores_ids = serializers.ListField(child=serializers.IntegerField(), required=False, allow_empty=True)
     tutor_academico = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     autor_academico = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    area_de_conocimiento = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     # Datos del Ejemplar
     id_ubicacion = serializers.PrimaryKeyRelatedField(queryset=Ubicaciones.objects.all(), required=False, allow_null=True)
     codigo_cota = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     tomo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     unidad_fisica = serializers.IntegerField(required=False, min_value=1, default=1)
-    id_estado_ejemplar = serializers.PrimaryKeyRelatedField(queryset=EstadosEjemplar.objects.all())
+    id_estado_ejemplar = serializers.PrimaryKeyRelatedField(queryset=EstadosEjemplar.objects.all(), required=False, allow_null=True)
 
     def validate(self, data):
         tipo = data['id_tipo_documento'].nombre_tipo.upper()
@@ -116,32 +125,100 @@ class DocumentoCreateSerializer(serializers.Serializer):
         if tipo == 'PASANTIA' and not data.get('autor_academico'):
             raise serializers.ValidationError('autor_academico requerido para PASANTIA')
 
+        if not (data.get('autores') or data.get('autores_ids')):
+            raise serializers.ValidationError('Debe enviar autores o autores_ids')
+
+        # Si se envía un ejemplar en el mismo POST, debe venir con estado
+        if (data.get('tomo') or data.get('codigo_cota')) and not data.get('id_estado_ejemplar'):
+            raise serializers.ValidationError('id_estado_ejemplar requerido cuando se envía tomo/codigo_cota')
+
         cota = data.get('codigo_cota')
         tomo = data.get('tomo')
         if cota and tomo:
             if Ejemplares.objects.filter(codigo_cota=cota, tomo=tomo).exists():
                 raise serializers.ValidationError('Conflicto: Ya existe un ejemplar con esa cota y tomo.', code='409')
+
+        # Restringir área a catálogo existente si ya hay valores en BD
+        if tipo == 'LIBRO' and data.get('area_de_conocimiento'):
+            def norm(v: str) -> str:
+                v = (v or '').strip().lower()
+                v = unicodedata.normalize('NFKD', v)
+                v = ''.join(ch for ch in v if not unicodedata.combining(ch))
+                v = ' '.join(v.split())
+                return v
+
+            area_in = data.get('area_de_conocimiento')
+            existing = list(
+                LibroDetalle.objects.exclude(area_de_conocimiento__isnull=True)
+                .exclude(area_de_conocimiento__exact='')
+                .values_list('area_de_conocimiento', flat=True)
+                .distinct()[:1000]
+            )
+            if existing:
+                existing_norm = {norm(x): x for x in existing if norm(x)}
+                k = norm(area_in)
+                if k not in existing_norm:
+                    raise serializers.ValidationError('area_de_conocimiento inválida: debe seleccionar un área existente')
+                data['area_de_conocimiento'] = existing_norm[k]
         return data
 
     def create(self, validated):
-        autores_nombres = validated.pop('autores')
+        autores_nombres = validated.pop('autores', None)
+        autores_ids = validated.pop('autores_ids', None)
         tutor_name = validated.pop('tutor_academico', None)
         autor_acad_name = validated.pop('autor_academico', None)
+        area_name = validated.pop('area_de_conocimiento', None)
+
+        def norm(v: str) -> str:
+            v = (v or '').strip().lower()
+            v = unicodedata.normalize('NFKD', v)
+            v = ''.join(ch for ch in v if not unicodedata.combining(ch))
+            v = ' '.join(v.split())
+            return v
+
+        # Canonicalizar tutor para evitar duplicados por mayúsculas/acentos
+        if tutor_name:
+            k = norm(tutor_name)
+            existing = list(
+                DocumentoAcademico.objects.exclude(tutor_academico__isnull=True)
+                .exclude(tutor_academico__exact='')
+                .values_list('tutor_academico', flat=True)
+                .distinct()[:1000]
+            )
+            canon = {norm(x): x for x in existing if norm(x)}
+            if k in canon:
+                tutor_name = canon[k]
+
+        # Canonicalizar área (si viene) por consistencia
+        if area_name:
+            k = norm(area_name)
+            existing = list(
+                LibroDetalle.objects.exclude(area_de_conocimiento__isnull=True)
+                .exclude(area_de_conocimiento__exact='')
+                .values_list('area_de_conocimiento', flat=True)
+                .distinct()[:1000]
+            )
+            canon = {norm(x): x for x in existing if norm(x)}
+            if k in canon:
+                area_name = canon[k]
 
         # datos ejemplar
         ubic = validated.pop('id_ubicacion', None)
         cota = validated.pop('codigo_cota', None)
         tomo = validated.pop('tomo', None)
         unidades = validated.pop('unidad_fisica', 1)
-        estado_ej = validated.pop('id_estado_ejemplar')
+        estado_ej = validated.pop('id_estado_ejemplar', None)
 
         with transaction.atomic():
             # Autores
             autores_objs = []
-            for full in autores_nombres:
-                parts = full.split(' ', 1)
-                a, _ = Autores.objects.get_or_create(nombre=parts[0], apellido=(parts[1] if len(parts) > 1 else ''))
-                autores_objs.append(a)
+            if autores_ids:
+                autores_objs = list(Autores.objects.filter(id_autor__in=autores_ids))
+            else:
+                for full in (autores_nombres or []):
+                    parts = full.split(' ', 1)
+                    a, _ = Autores.objects.get_or_create(nombre=parts[0], apellido=(parts[1] if len(parts) > 1 else ''))
+                    autores_objs.append(a)
 
             # Crear documento
             doc = Documentos.objects.create(**validated)
@@ -152,7 +229,7 @@ class DocumentoCreateSerializer(serializers.Serializer):
                 DocumentoAutores.objects.create(id_documento=doc, id_autor=a)
 
             # Campos académicos opcionales en tablas detalle
-            from .models import DocumentoAcademico, InformePasantiaDetalle
+            from .models import InformePasantiaDetalle
             if tutor_name:
                 DocumentoAcademico.objects.update_or_create(
                     id_documento=doc, defaults={'tutor_academico': tutor_name}
@@ -160,6 +237,10 @@ class DocumentoCreateSerializer(serializers.Serializer):
             if autor_acad_name:
                 InformePasantiaDetalle.objects.update_or_create(
                     id_documento=doc, defaults={'autor_academico': autor_acad_name}
+                )
+            if area_name:
+                LibroDetalle.objects.update_or_create(
+                    id_documento=doc, defaults={'area_de_conocimiento': area_name}
                 )
 
             # Crear ejemplar si hay datos suficientes
@@ -179,4 +260,27 @@ class DocumentoUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Documentos
         fields = ['titulo', 'id_carrera', 'id_tipo_documento', 'fecha_publicacion']
+
+
+# Prestamos
+class PrestamoItemSerializer(serializers.Serializer):
+    id_ejemplar = serializers.IntegerField()
+
+
+class PrestamoCreateSerializer(serializers.Serializer):
+    id_usuario = serializers.IntegerField()
+    fecha_vencimiento = serializers.DateField()
+    ejemplares = PrestamoItemSerializer(many=True)
+    observacion = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class PrestamoUpdateSerializer(serializers.Serializer):
+    fecha_vencimiento = serializers.DateField(required=False)
+    ejemplares = PrestamoItemSerializer(many=True, required=False)
+    observacion = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Debe enviar al menos un campo para actualizar')
+        return attrs
 

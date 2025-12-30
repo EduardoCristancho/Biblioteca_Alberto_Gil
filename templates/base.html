@@ -1,0 +1,57 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteca Alberto Gil | {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="library-logo">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Biblioteca Alberto Gil</span>
+            </div>
+            <nav>
+                <ul>
+                    <li class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                        <a href="{% url 'dashboard' %}">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_page == 'inventario' %}active{% endif %}">
+                        <a href="{% url 'gestion_inventario' %}">
+                            <i class="fa-solid fa-box-archive"></i>
+                            Gestión de Inventario
+                        </a>
+                    </li>
+                    <li class="nav-item {% if active_page == 'prestamos' %}active{% endif %}">
+                        <a href="{% url 'gestion_prestamos' %}">
+                            <i class="fa-solid fa-handshake"></i>
+                            Módulo de Préstamos
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" class="logout-btn">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Cerrar Sesión
+                </a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</body>
+</html>
