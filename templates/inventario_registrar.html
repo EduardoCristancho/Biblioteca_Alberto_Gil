@@ -414,7 +414,7 @@
             const nombre = parts.shift() || '';
             const apellido = parts.join(' ');
             try{
-              const resp = await fetch('/api/autores/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nombre, apellido})});
+              const resp = await csrfFetch('/api/autores/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nombre, apellido})});
               if(!resp.ok){
                 const t = await resp.text().catch(()=> 'Error');
                 await swalError('No se pudo crear autor', t.substring(0,200));
@@ -583,7 +583,7 @@
           tutor_academico: tipoActual.tipo === 'TESIS' ? tutor : null,
           area_de_conocimiento: tipoActual.tipo === 'LIBRO' ? area : null,
         };
-        const resp = await fetch('/api/documentos/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadDoc)});
+        const resp = await csrfFetch('/api/documentos/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadDoc)});
         if(!resp.ok){
           const t = await resp.text().catch(()=> 'Error');
           await swalError('No se pudo crear el documento', t.substring(0,200));
@@ -602,7 +602,7 @@
           id_estado_ejemplar: ej.id_estado_ejemplar,
           id_ubicacion: ej.id_ubicacion,
         };
-        const resp = await fetch(`/api/documentos/${finalDocId}/ejemplares`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadEj)});
+        const resp = await csrfFetch(`/api/documentos/${finalDocId}/ejemplares`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadEj)});
         results.push({ok: resp.ok});
         if(!resp.ok){
           const t = await resp.text().catch(()=> 'Error');

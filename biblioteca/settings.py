@@ -52,20 +52,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'biblioteca.wsgi.application'
 
-# Database (TiDB/MySQL compatible)
+# Database (SQLite local)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', '4000'),
-        'NAME': os.getenv('DB_NAME', ''),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'OPTIONS': {
-            'ssl': {'ssl': {} } if os.getenv('DB_SSLMODE', 'true').lower() == 'true' else {},
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

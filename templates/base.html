@@ -9,6 +9,27 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <script>
+    (function(){
+        function getCookie(name){
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if(parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        window.csrfFetch = function(url, options){
+            const opts = options || {};
+            const method = String(opts.method || 'GET').toUpperCase();
+            const headers = new Headers(opts.headers || {});
+            if(!['GET','HEAD','OPTIONS','TRACE'].includes(method)){
+                const token = getCookie('csrftoken');
+                if(token) headers.set('X-CSRFToken', token);
+            }
+            return fetch(url, {...opts, headers, credentials: opts.credentials || 'same-origin'});
+        };
+    })();
+    </script>
 </head>
 <body>
     <div class="app-container">

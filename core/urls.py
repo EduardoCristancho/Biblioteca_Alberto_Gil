@@ -10,6 +10,7 @@ from .views import (
     EjemplarCreateView,
     PrestamoListCreateView, PrestamoDetailView, PrestamoConcluirView,
     AreaSugerenciaView, TutorSugerenciaView, AreaCatalogoView,
+    UsuarioSugerenciaView,
 )
 
 router = DefaultRouter()
@@ -44,6 +45,7 @@ urlpatterns = [
     # Sugerencias (combobox)
     path('sugerencias/areas', AreaSugerenciaView.as_view()),
     path('sugerencias/tutores', TutorSugerenciaView.as_view()),
+    path('sugerencias/usuarios', UsuarioSugerenciaView.as_view()),
     path('areas/', AreaCatalogoView.as_view()),
 
     # Prestamos

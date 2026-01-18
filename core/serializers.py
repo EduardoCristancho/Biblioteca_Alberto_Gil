@@ -138,7 +138,7 @@ class DocumentoCreateSerializer(serializers.Serializer):
             if Ejemplares.objects.filter(codigo_cota=cota, tomo=tomo).exists():
                 raise serializers.ValidationError('Conflicto: Ya existe un ejemplar con esa cota y tomo.', code='409')
 
-        # Restringir área a catálogo existente si ya hay valores en BD
+        # Normalizar área de conocimiento para consistencia (sin restringir a catálogo)
         if tipo == 'LIBRO' and data.get('area_de_conocimiento'):
             def norm(v: str) -> str:
                 v = (v or '').strip().lower()
@@ -148,6 +148,7 @@ class DocumentoCreateSerializer(serializers.Serializer):
                 return v
 
             area_in = data.get('area_de_conocimiento')
+            # Buscar si ya existe un área similar (para reutilizar la forma canónica)
             existing = list(
                 LibroDetalle.objects.exclude(area_de_conocimiento__isnull=True)
                 .exclude(area_de_conocimiento__exact='')
@@ -157,9 +158,10 @@ class DocumentoCreateSerializer(serializers.Serializer):
             if existing:
                 existing_norm = {norm(x): x for x in existing if norm(x)}
                 k = norm(area_in)
-                if k not in existing_norm:
-                    raise serializers.ValidationError('area_de_conocimiento inválida: debe seleccionar un área existente')
-                data['area_de_conocimiento'] = existing_norm[k]
+                # Si el área ya existe (normalizada), usar la forma canónica existente
+                if k in existing_norm:
+                    data['area_de_conocimiento'] = existing_norm[k]
+                # Si no existe, permitir crear nueva área (no lanzar error)
         return data
 
     def create(self, validated):

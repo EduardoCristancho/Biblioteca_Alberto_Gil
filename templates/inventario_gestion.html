@@ -323,7 +323,7 @@
         if(action === 'eliminar'){
           const conf = await Swal.fire({icon:'warning', title:'Eliminar documento', text:'¿Desea eliminar este documento?', showCancelButton:true, confirmButtonText:'Sí, eliminar'});
           if(conf.isConfirmed){
-            const resp = await fetch(`/api/documentos/${id}/delete`, {method:'DELETE'});
+            const resp = await csrfFetch(`/api/documentos/${id}/delete`, {method:'DELETE'});
             if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return;}
             Swal.fire({icon:'success', title:'Eliminado'});
             buscar();
@@ -460,7 +460,7 @@
           const url = editEid ? `/api/ejemplares/${editEid}` : `/api/documentos/${doc.id_documento}/ejemplares`;
           const method = editEid ? 'PUT' : 'POST';
 
-          const resp = await fetch(url, {
+          const resp = await csrfFetch(url, {
             method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
           });
           if(!resp.ok){
@@ -502,7 +502,7 @@
           const eid = btn.getAttribute('data-eid');
           const conf = await Swal.fire({icon:'warning', title:'Eliminar ejemplar', showCancelButton:true});
           if(!conf.isConfirmed) return;
-          const resp = await fetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
+          const resp = await csrfFetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
           if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return; }
           Swal.fire({icon:'success', title:'Ejemplar eliminado'});
           buscar();
@@ -598,7 +598,7 @@
             const url = editEid ? `/api/ejemplares/${editEid}` : `/api/documentos/${doc.id_documento}/ejemplares`;
             const method = editEid ? 'PUT' : 'POST';
 
-            const resp = await fetch(url, {
+            const resp = await csrfFetch(url, {
               method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
             });
             if(!resp.ok){
@@ -640,7 +640,7 @@
             const eid = btn.getAttribute('data-eid');
             const conf = await Swal.fire({icon:'warning', title:'Eliminar ejemplar', showCancelButton:true});
             if(!conf.isConfirmed) return;
-            const resp = await fetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
+            const resp = await csrfFetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
             if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return; }
             Swal.fire({icon:'success', title:'Ejemplar eliminado'});
             buscar();

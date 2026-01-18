@@ -1,9 +1,12 @@
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from datetime import datetime
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.auth.hashers import check_password, make_password
 from django.http import Http404
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.conf import settings
 from django.utils import timezone
 from django.db.models import Exists, OuterRef, Min, Q, F, Value, Count, Subquery, IntegerField, Case, When, Sum, CharField
 from django.db.models.functions import Replace, Lower, Coalesce
@@ -26,6 +29,18 @@ from .models import (
     Prestamos, DetallePrestamo, Ejemplares, Roles, EstadosEjemplar, LibroDetalle, DocumentoAcademico, DocumentoAutores
 )
 from .filters import DocumentoFilter
+
+
+def _is_admin_user(user) -> bool:
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+        return True
+    try:
+        udom = Usuarios.objects.select_related('id_rol').get(id_usuario=user.id)
+        return (udom.id_rol and str(udom.id_rol.nombre_rol).strip().lower() == 'admin')
+    except Exception:
+        return False
 
 
 def _normalize_text(value: str) -> str:
@@ -115,7 +130,13 @@ class LoginView(generics.GenericAPIView):
         # Iniciar sesión en Django
         login(request, auth_user, backend='django.contrib.auth.backends.ModelBackend')
         resp = Response({'message': 'Login exitoso'})
-        resp.set_cookie('sessionid', request.session.session_key, httponly=True, secure=True, samesite='Strict')
+        resp.set_cookie(
+            'sessionid',
+            request.session.session_key,
+            httponly=True,
+            secure=(not settings.DEBUG),
+            samesite='Lax',
+        )
         return resp
 
 class LogoutView(generics.GenericAPIView):
@@ -798,21 +819,43 @@ class PrestamoListCreateView(generics.GenericAPIView):
         else:
             return Response({'detail': 'id_user es requerido'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validación/creación: si no existe local, simular consulta externa. Si existe en externo, crear local con esa misma PK; si no, rechazar.
+        # Validación/creación: buscar en BD interna, si no existe buscar en externa y registrar
         if not Usuarios.objects.filter(id_usuario=payload['id_usuario']).exists():
-            s = str(payload['id_usuario'])
-            # Simulación externa: IDs que terminan en 5-9 no existen
-            if int(s[-1]) >= 5:
-                return Response({'detail': 'El id_user no coincide con ningún estudiante o profesor'}, status=status.HTTP_404_NOT_FOUND)
-            rol_id = Roles.objects.first().id_rol if Roles.objects.exists() else 1
-            Usuarios.objects.create(
-                id_usuario=int(s),
-                nombre='Usuario',
-                apellido=f'CED{s}',
-                email=f'user_{s}@example.com',
-                password=None,
-                id_rol_id=rol_id,
-            )
+            from .external import ExternalUserClient
+            
+            # Intentar obtener usuario de BD externa
+            try:
+                external_user = ExternalUserClient.fetch(payload['id_usuario'])
+                
+                if external_user:
+                    # Usuario encontrado en BD externa, registrarlo en BD interna
+                    rol_id = external_user.get('rol') or (Roles.objects.first().id_rol if Roles.objects.exists() else 1)
+                    
+                    # Asegurar que el rol existe
+                    if not Roles.objects.filter(id_rol=rol_id).exists():
+                        rol_id = Roles.objects.first().id_rol if Roles.objects.exists() else 1
+                    
+                    Usuarios.objects.create(
+                        id_usuario=external_user['id'],
+                        nombre=external_user['nombre'] or 'Usuario',
+                        apellido=external_user['apellido'] or 'Externo',
+                        email=external_user.get('email'),
+                        password=None,  # Usuario externo no tiene contraseña local
+                        id_rol_id=rol_id,
+                    )
+                    logger.info(f"Usuario {external_user['id']} registrado desde BD externa")
+                else:
+                    # Usuario no existe ni en BD interna ni externa
+                    return Response(
+                        {'detail': 'El usuario no existe. Verifique el ID ingresado.'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            except Exception as e:
+                logger.error(f"Error consultando BD externa para usuario {payload['id_usuario']}: {e}")
+                return Response(
+                    {'detail': 'Error al verificar usuario. Intente nuevamente.'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         ser = PrestamoCreateSerializer(data=payload)
         ser.is_valid(raise_exception=True)
@@ -1163,6 +1206,66 @@ class TutorSugerenciaView(generics.GenericAPIView):
         return Response(out[:30])
 
 
+class UsuarioSugerenciaView(generics.GenericAPIView):
+    """
+    Vista para búsqueda de usuarios con fallback a BD externa.
+    Flujo: BD interna → BD externa → combinar resultados
+    """
+    def get(self, request):
+        term = (request.GET.get('search') or '').strip()
+        if not term:
+            return Response([])
+
+        # 1. Buscar en BD interna (SQLite local)
+        qs = Usuarios.objects.all()
+        s = term.strip()
+        if s.isdigit():
+            qs = qs.filter(id_usuario=int(s))
+        else:
+            qs = qs.filter(Q(nombre__icontains=s) | Q(apellido__icontains=s))
+
+        qs = qs.order_by('id_usuario')[:20]
+        data_interna = [
+            {
+                'id_usuario': u.id_usuario,
+                'nombre': u.nombre,
+                'apellido': u.apellido,
+                'source': 'internal'
+            }
+            for u in qs
+        ]
+
+        # 2. Si no hay suficientes resultados, buscar en BD externa
+        data_externa = []
+        if len(data_interna) < 5:  # Buscar en externa si hay pocos resultados
+            from .external import ExternalUserClient
+            try:
+                external_results = ExternalUserClient.search(term, limit=20)
+                # Filtrar usuarios que ya están en BD interna
+                ids_internos = {u['id_usuario'] for u in data_interna}
+                data_externa = [
+                    {
+                        'id_usuario': u['id_usuario'],
+                        'nombre': u['nombre'],
+                        'apellido': u['apellido'],
+                        'source': 'external'
+                    }
+                    for u in external_results
+                    if u['id_usuario'] not in ids_internos
+                ]
+            except Exception as e:
+                logger.error(f"Error buscando en BD externa: {e}")
+
+        # 3. Combinar resultados (internos primero, luego externos)
+        data = data_interna + data_externa
+        
+        # Remover el campo 'source' antes de enviar respuesta
+        for item in data:
+            item.pop('source', None)
+        
+        return Response(data[:20])  # Limitar a 20 resultados totales
+
+
 # ------------------------
 # Vistas Web (Templates)
 # ------------------------
@@ -1170,14 +1273,20 @@ class TutorSugerenciaView(generics.GenericAPIView):
 def login_page(request):
     error = None
     username = ''
+    if request.user.is_authenticated:
+        return redirect('dashboard')
     if request.method == 'POST':
-        # Mock de autenticación simple (acepta cualquier usuario)
-        username = request.POST.get('username', '')
+        username = (request.POST.get('username', '') or '').strip()
         password = request.POST.get('password', '')
         if not username or not password:
             error = 'Ingrese usuario y contraseña'
         else:
-            return redirect('dashboard')
+            user = authenticate(request, username=username, password=password)
+            if user is None:
+                error = 'Credenciales inválidas'
+            else:
+                login(request, user)
+                return redirect('dashboard')
     return render(request, 'login.html', {'error': error, 'username': username})
 
 
@@ -1190,25 +1299,41 @@ def logout_page(request):
     return redirect('login')
 
 
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def dashboard_page(request):
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
     return render(request, 'dashboard.html', {'active_page': 'dashboard'})
 
 
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def inventario_gestion_page(request):
     # Render-only: el front consumirá el API (o mock) vía JS
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
     return render(request, 'inventario_gestion.html', {'active_page': 'inventario'})
 
 
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def inventario_registrar_page(request):
     # Render-only: el front enviará POST al API (o mock) vía JS
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
     return render(request, 'inventario_registrar.html', {'active_page': 'inventario'})
 
 
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def prestamos_gestion_page(request):
     # Render-only: el front consumirá el API (o mock) vía JS
     return render(request, 'prestamos_gestion.html', {'active_page': 'prestamos'})
 
 
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def prestamos_registrar_page(request):
     # Render-only: el front enviará POST al API (o mock) vía JS
     return render(request, 'prestamos_registrar.html', {'active_page': 'prestamos'})

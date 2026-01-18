@@ -18,10 +18,14 @@
                 Identificación del Usuario
             </div>
             
-            <div class="form-group search-input-group">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="input-cedula" type="text" placeholder="Ingrese cédula o ID del usuario...">
+            <div class="lookup-box">
+                <div class="form-group search-input-group">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="input-cedula" type="text" placeholder="Ingrese cédula, nombre o apellido del usuario..." autocomplete="off">
+                </div>
+                <div id="usuario-suggestions" class="lookup-results" style="display:none;"></div>
             </div>
+            <small id="usuario-hint" style="color: var(--text-light); display: block; margin-top: 8px;"></small>
 
             <div class="form-row">
                 <div class="form-group">
@@ -84,6 +88,8 @@
   const btnCancelar = document.getElementById('btn-cancelar');
   const inputCedula = document.getElementById('input-cedula');
   const inputFechaLimite = document.getElementById('fecha-limite');
+  const userSug = document.getElementById('usuario-suggestions');
+  const userHint = document.getElementById('usuario-hint');
 
   let seleccionados = []; // {id_ejemplar, titulo, cota}
   let prefill = { id_documento: null, titulo: null, tomo: null };
@@ -129,6 +135,76 @@
       tbodySel.appendChild(tr);
     });
   }
+
+  // Buscar usuario por cédula/ID/nombre con sugerencias
+  let tu;
+  let selectedUserId = null;
+  
+  function renderUserSuggestions(list){
+    if(!list || !list.length){
+      userSug.style.display = 'none';
+      userSug.innerHTML = '';
+      return;
+    }
+    userSug.innerHTML = list.map(u => {
+      const nombreCompleto = `${(u.nombre||'').trim()} ${(u.apellido||'').trim()}`.trim();
+      return `
+        <div class="lookup-item" data-id="${u.id_usuario}" data-nombre="${nombreCompleto}">
+          <div class="lookup-title">${nombreCompleto || 'Sin nombre'}</div>
+          <div class="lookup-sub">ID: ${u.id_usuario}</div>
+        </div>
+      `;
+    }).join('');
+    userSug.style.display = 'block';
+    
+    userSug.querySelectorAll('.lookup-item').forEach(el => {
+      el.addEventListener('click', ()=>{
+        const uid = el.getAttribute('data-id');
+        const name = el.getAttribute('data-nombre');
+        selectedUserId = uid;
+        inputCedula.value = uid || '';
+        userHint.textContent = name ? `✓ Usuario: ${name} (ID: ${uid})` : `✓ Usuario ID: ${uid}`;
+        userHint.style.color = 'var(--status-green)';
+        userSug.style.display = 'none';
+        userSug.innerHTML = '';
+      });
+    });
+  }
+
+  inputCedula.addEventListener('input', ()=>{
+    const term = (inputCedula.value||'').trim();
+    userHint.textContent = '';
+    userHint.style.color = 'var(--text-light)';
+    selectedUserId = null;
+    clearTimeout(tu);
+    
+    if(term.length < 1){
+      renderUserSuggestions([]);
+      return;
+    }
+    
+    tu = setTimeout(async ()=>{
+      try{
+        const resp = await fetch(`/api/sugerencias/usuarios?search=${encodeURIComponent(term)}`);
+        if(!resp.ok){ 
+          renderUserSuggestions([]); 
+          return; 
+        }
+        const data = await resp.json();
+        renderUserSuggestions(Array.isArray(data) ? data : []);
+      }catch(e){
+        console.error('Error buscando usuarios:', e);
+        renderUserSuggestions([]);
+      }
+    }, 300);
+  });
+
+  // Cerrar sugerencias al hacer clic fuera
+  document.addEventListener('click', (e)=>{
+    if(!userSug.contains(e.target) && e.target !== inputCedula){
+      userSug.style.display = 'none';
+    }
+  });
 
   async function buscar(q){
     if(!q || q.trim().length < 2){
@@ -332,7 +408,7 @@ function renderResultados(docs) {
     };
 
     try{
-      const resp = await fetch('/api/prestamo', {
+      const resp = await csrfFetch('/api/prestamo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -83,7 +83,7 @@ class Autores(models.Model):
     apellido = models.CharField(max_length=100)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'autores'
 
 
@@ -92,7 +92,7 @@ class Carreras(models.Model):
     nombre_carrera = models.CharField(max_length=150)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'carreras'
 
 
@@ -104,7 +104,7 @@ class DetallePrestamo(models.Model):
     fecha_devolucion_real = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'detalle_prestamo'
 
 
@@ -158,7 +158,7 @@ class DocumentoAcademico(models.Model):
     tutor_academico = models.CharField(max_length=150, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'documento_academico'
 
 
@@ -168,7 +168,7 @@ class DocumentoAutores(models.Model):
     id_autor = models.ForeignKey(Autores, models.DO_NOTHING, db_column='id_autor')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'documento_autores'
 
 
@@ -181,7 +181,7 @@ class Documentos(models.Model):
     id_carrera = models.ForeignKey(Carreras, models.DO_NOTHING, db_column='id_carrera', blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'documentos'
 
 
@@ -195,7 +195,7 @@ class Ejemplares(models.Model):
     codigo_cota = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'ejemplares'
 
 
@@ -204,7 +204,7 @@ class EstadosEjemplar(models.Model):
     nombre_estado = models.CharField(max_length=50)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'estados_ejemplar'
 
 
@@ -213,7 +213,7 @@ class InformePasantiaDetalle(models.Model):
     autor_academico = models.CharField(max_length=150, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'informe_pasantia_detalle'
 
 
@@ -222,7 +222,7 @@ class LibroDetalle(models.Model):
     area_de_conocimiento = models.CharField(max_length=150, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'libro_detalle'
 
 
@@ -233,7 +233,7 @@ class Prestamos(models.Model):
     observacion = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'prestamos'
 
 
@@ -242,7 +242,7 @@ class Roles(models.Model):
     nombre_rol = models.CharField(max_length=50)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'roles'
 
 
@@ -251,7 +251,7 @@ class TipoDocumento(models.Model):
     nombre_tipo = models.CharField(max_length=100)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tipo_documento'
 
 
@@ -262,7 +262,7 @@ class Ubicaciones(models.Model):
     descripcion_completa = models.CharField(max_length=150, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'ubicaciones'
 
 
@@ -275,5 +275,5 @@ class Usuarios(models.Model):
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'usuarios'

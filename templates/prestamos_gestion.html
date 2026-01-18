@@ -393,7 +393,7 @@
         if(!res.isConfirmed) return;
         try{
           const payload = {fecha_vencimiento: res.value.due, observacion: res.value.obs};
-          const resp = await fetch(`/api/prestamo/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          const resp = await csrfFetch(`/api/prestamo/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
           if(!resp.ok){
             const t = await resp.text().catch(()=> 'Error');
             Swal.fire({icon:'error', title:'No se pudo actualizar', text: t.substring(0,200), heightAuto:false});
@@ -437,7 +437,7 @@
         if(!res.isConfirmed) return;
         try{
           const payload = {observacion: res.value.obs};
-          const resp = await fetch(`/api/prestamo/${id}/concluir`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          const resp = await csrfFetch(`/api/prestamo/${id}/concluir`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
           if(!resp.ok){
             const t = await resp.text().catch(()=> 'Error');
             Swal.fire({icon:'error', title:'No se pudo concluir', text: t.substring(0,200), heightAuto:false});
@@ -455,7 +455,7 @@
         const conf = await Swal.fire({icon:'warning', title:`Eliminar préstamo #${id}`, text:'Esta acción eliminará el préstamo y sus detalles.', showCancelButton:true, confirmButtonText:'Sí, eliminar', heightAuto:false});
         if(!conf.isConfirmed) return;
         try{
-          const resp = await fetch(`/api/prestamo/${id}`, {method:'DELETE'});
+          const resp = await csrfFetch(`/api/prestamo/${id}`, {method:'DELETE'});
           if(!resp.ok){
             const t = await resp.text().catch(()=> 'Error');
             Swal.fire({icon:'error', title:'No se pudo eliminar', text: t.substring(0,200), heightAuto:false});
