@@ -15,34 +15,43 @@
     </div>
 
     <div class="dashboard-grid">
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <p>Total de Ítems Físicos</p>
-                <i class="fa-solid fa-file blue"></i>
+        <a href="{% url 'gestion_inventario' %}" style="text-decoration: none; color: inherit;">
+            <div class="stat-card" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'">
+                <div class="stat-card-header">
+                    <p>Títulos Únicos</p>
+                    <i class="fa-solid fa-book blue"></i>
+                </div>
+                <h2>{{ total_documentos|default:0 }}</h2>
+                <small style="color: var(--text-light); font-size: 12px;">{{ total_items|default:0 }} copias físicas</small>
             </div>
-            <h2>12,847</h2>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <p>Préstamos Activos</p>
-                <i class="fa-solid fa-check green"></i>
+        </a>
+        <a href="{% url 'gestion_prestamos' %}?estado=activo" style="text-decoration: none; color: inherit;">
+            <div class="stat-card" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'">
+                <div class="stat-card-header">
+                    <p>Préstamos Activos</p>
+                    <i class="fa-solid fa-check green"></i>
+                </div>
+                <h2>{{ prestamos_activos|default:0 }}</h2>
             </div>
-            <h2>2,156</h2>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <p>Libros Vencidos</p>
-                <i class="fa-solid fa-triangle-exclamation red"></i>
+        </a>
+        <a href="{% url 'gestion_prestamos' %}?estado=retrasado" style="text-decoration: none; color: inherit;">
+            <div class="stat-card" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'">
+                <div class="stat-card-header">
+                    <p>Libros Vencidos</p>
+                    <i class="fa-solid fa-triangle-exclamation red"></i>
+                </div>
+                <h2>{{ prestamos_vencidos|default:0 }}</h2>
             </div>
-            <h2>47</h2>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <p>Usuarios Registrados</p>
-                <i class="fa-solid fa-users purple"></i>
+        </a>
+        <a href="{% url 'gestion_usuarios' %}" style="text-decoration: none; color: inherit;">
+            <div class="stat-card" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'">
+                <div class="stat-card-header">
+                    <p>Usuarios Registrados</p>
+                    <i class="fa-solid fa-users purple"></i>
+                </div>
+                <h2>{{ usuarios_registrados|default:0 }}</h2>
             </div>
-            <h2>3,892</h2>
-        </div>
+        </a>
     </div>
 
     <div class="main-sections">
@@ -53,41 +62,22 @@
             </div>
             <p style="font-size: 14px; color: var(--status-red); margin-bottom: 10px;">Acción crítica requerida</p>
             <div class="item-list">
-                <div class="list-item">
-                    <div class="item-info">
-                        <p>El Quijote de la Mancha</p>
-                        <p>María González</p>
+                {% if prestamos_vencidos_list %}
+                    {% for prestamo in prestamos_vencidos_list %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <p>{{ prestamo.titulo }}</p>
+                            <p>{{ prestamo.usuario }}</p>
+                        </div>
+                        <span class="days-badge">{{ prestamo.dias }} día{{ prestamo.dias|pluralize:"s" }}</span>
                     </div>
-                    <span class="days-badge">15 días</span>
-                </div>
-                <div class="list-item">
-                    <div class="item-info">
-                        <p>Cien Años de Soledad</p>
-                        <p>Carlos Rodríguez</p>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fa-solid fa-check-circle" style="color: var(--status-green);"></i>
+                        <p>No hay préstamos vencidos</p>
                     </div>
-                    <span class="days-badge">12 días</span>
-                </div>
-                <div class="list-item">
-                    <div class="item-info">
-                        <p>1984</p>
-                        <p>Ana López</p>
-                    </div>
-                    <span class="days-badge">8 días</span>
-                </div>
-                <div class="list-item">
-                    <div class="item-info">
-                        <p>El Principito</p>
-                        <p>Pedro Martín</p>
-                    </div>
-                    <span class="days-badge">5 días</span>
-                </div>
-                <div class="list-item">
-                    <div class="item-info">
-                        <p>La Casa de Bernarda Alba</p>
-                        <p>Elena Jiménez</p>
-                    </div>
-                    <span class="days-badge">3 días</span>
-                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -98,41 +88,22 @@
             </div>
             <p style="font-size: 14px; color: var(--status-orange); margin-bottom: 10px;">Stock agotado</p>
             <div class="item-list">
-                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
-                    <div class="item-info">
-                        <p>Rayuela</p>
-                        <p>Julio Cortázar</p>
+                {% if inventario_critico %}
+                    {% for item in inventario_critico %}
+                    <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
+                        <div class="item-info">
+                            <p>{{ item.titulo }}</p>
+                            <p>{{ item.autor }}</p>
+                        </div>
+                        <span class="unavailable-badge">0 disponibles</span>
                     </div>
-                    <span class="unavailable-badge">0 disponibles</span>
-                </div>
-                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
-                    <div class="item-info">
-                        <p>Matar a un Ruiseñor</p>
-                        <p>Harper Lee</p>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fa-solid fa-check-circle" style="color: var(--status-green);"></i>
+                        <p>Todo el inventario tiene stock disponible</p>
                     </div>
-                    <span class="unavailable-badge">0 disponibles</span>
-                </div>
-                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
-                    <div class="item-info">
-                        <p>El Aleph</p>
-                        <p>Jorge Luis Borges</p>
-                    </div>
-                    <span class="unavailable-badge">0 disponibles</span>
-                </div>
-                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
-                    <div class="item-info">
-                        <p>Ficciones</p>
-                        <p>Jorge Luis Borges</p>
-                    </div>
-                    <span class="unavailable-badge">0 disponibles</span>
-                </div>
-                <div class="list-item" style="border-color: var(--status-orange); background-color: rgba(255, 193, 7, 0.05);">
-                    <div class="item-info">
-                        <p>Crónica de una Muerte Anunciada</p>
-                        <p>Gabriel García Márquez</p>
-                    </div>
-                    <span class="unavailable-badge">0 disponibles</span>
-                </div>
+                {% endif %}
             </div>
         </div>
     </div>

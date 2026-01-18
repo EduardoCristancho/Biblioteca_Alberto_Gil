@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <div>
+            <h1>Gestión de Usuarios</h1>
+            <p>Listado completo de usuarios registrados en el sistema</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i>
+            Volver al Dashboard
+        </a>
+    </div>
+
+    <div class="search-bar">
+        <input id="search-input" type="text" class="search-input" placeholder="Buscar por ID, nombre o apellido...">
+        
+        <div class="filter-grid">
+            <div class="filter-item">
+                <select id="filter-rol">
+                    <option value="">Todos los roles</option>
+                    {% for rol in roles %}
+                    <option value="{{ rol.id_rol }}">{{ rol.nombre_rol }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-item">
+                <select id="filter-tipo">
+                    <option value="">Todos los tipos</option>
+                    <option value="con_login">Con acceso al sistema</option>
+                    <option value="sin_login">Solo préstamos</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="results-section">
+        <p class="results-title">Usuarios Registrados</p>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre Completo</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Tipo</th>
+                        <th>Préstamos</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="usuarios-tbody">
+                    {% for usuario in usuarios %}
+                    <tr data-id="{{ usuario.id_usuario }}" data-nombre="{{ usuario.nombre|lower }} {{ usuario.apellido|lower }}" data-rol="{{ usuario.id_rol.id_rol|default:'' }}" data-tipo="{{ usuario.tipo }}">
+                        <td><strong>{{ usuario.id_usuario }}</strong></td>
+                        <td>{{ usuario.nombre }} {{ usuario.apellido }}</td>
+                        <td>{{ usuario.email|default:"Sin email" }}</td>
+                        <td>
+                            {% if usuario.id_rol %}
+                            <span class="type-badge" style="background-color: {% if usuario.id_rol.nombre_rol == 'Admin' %}#e74c3c{% elif usuario.id_rol.nombre_rol == 'Bibliotecario' %}#3498db{% else %}#95a5a6{% endif %}">
+                                {{ usuario.id_rol.nombre_rol }}
+                            </span>
+                            {% else %}
+                            <span style="color: var(--text-light);">Sin rol</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if usuario.tiene_login %}
+                            <span class="status-badge activo">Con acceso</span>
+                            {% else %}
+                            <span class="status-badge" style="background-color: #fff3cd; color: #856404;">Solo préstamos</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="unit-badge {% if usuario.prestamos_activos > 0 %}yellow{% else %}green{% endif %}">
+                                {{ usuario.prestamos_activos }} activo{{ usuario.prestamos_activos|pluralize:"s" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if usuario.prestamos_vencidos > 0 %}
+                            <span class="status-badge vencido">{{ usuario.prestamos_vencidos }} vencido{{ usuario.prestamos_vencidos|pluralize:"s" }}</span>
+                            {% else %}
+                            <span class="status-badge activo">Al día</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <i class="fa-solid fa-users"></i>
+                            <p>No hay usuarios registrados</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-actions">
+            <span id="summary">Total: {{ usuarios|length }} usuario{{ usuarios|length|pluralize:"s" }}</span>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+        const searchInput = document.getElementById('search-input');
+        const filterRol = document.getElementById('filter-rol');
+        const filterTipo = document.getElementById('filter-tipo');
+        const tbody = document.getElementById('usuarios-tbody');
+        const summary = document.getElementById('summary');
+
+        function filterUsers(){
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const rolFilter = filterRol.value;
+            const tipoFilter = filterTipo.value;
+            
+            const rows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const id = row.getAttribute('data-id');
+                const nombre = row.getAttribute('data-nombre');
+                const rol = row.getAttribute('data-rol');
+                const tipo = row.getAttribute('data-tipo');
+
+                let show = true;
+
+                // Filtro de búsqueda
+                if(searchTerm && !id.includes(searchTerm) && !nombre.includes(searchTerm)){
+                    show = false;
+                }
+
+                // Filtro de rol
+                if(rolFilter && rol !== rolFilter){
+                    show = false;
+                }
+
+                // Filtro de tipo
+                if(tipoFilter === 'con_login' && tipo !== 'con_login'){
+                    show = false;
+                }
+                if(tipoFilter === 'sin_login' && tipo !== 'sin_login'){
+                    show = false;
+                }
+
+                row.style.display = show ? '' : 'none';
+                if(show) visibleCount++;
+            });
+
+            summary.textContent = `Mostrando: ${visibleCount} de ${rows.length} usuario${rows.length !== 1 ? 's' : ''}`;
+        }
+
+        searchInput.addEventListener('input', filterUsers);
+        filterRol.addEventListener('change', filterUsers);
+        filterTipo.addEventListener('change', filterUsers);
+    })();
+    </script>
+{% endblock %}

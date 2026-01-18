@@ -138,7 +138,7 @@ class Command(BaseCommand):
             'Metodología de la Investigación',
         ]
         tutores = [
-            'Dr. Alberto Gil',
+            'Dr. José Gil Alfonzo',
             'Dra. Mariana Ortega',
             'Ing. Luis Herrera',
             'MSc. Carmen Salazar',

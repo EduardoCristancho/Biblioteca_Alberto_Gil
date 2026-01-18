@@ -1304,7 +1304,122 @@ def logout_page(request):
 def dashboard_page(request):
     if not _is_admin_user(request.user):
         return redirect('gestion_prestamos')
-    return render(request, 'dashboard.html', {'active_page': 'dashboard'})
+    
+    from django.db.models import Count, Sum, Q, F, Min
+    from django.utils import timezone
+    
+    # 1. Total de documentos únicos (títulos)
+    total_documentos = Documentos.objects.count()
+    
+    # Total de ítems físicos (copias)
+    total_items = Ejemplares.objects.exclude(
+        id_estado_ejemplar__nombre_estado__icontains='ELIMIN'
+    ).exclude(unidad_fisica=0).aggregate(
+        total=Sum('unidad_fisica')
+    )['total'] or 0
+    
+    # 2. Préstamos activos (transacciones con detalles activos NO vencidos)
+    # Esto coincide con el filtro "activo" del módulo de préstamos
+    open_details = DetallePrestamo.objects.filter(
+        id_prestamo=OuterRef('pk'),
+        fecha_devolucion_real__isnull=True
+    )
+    
+    today = timezone.now().date()
+    
+    # Préstamos con al menos un detalle activo
+    prestamos_con_abiertos = Prestamos.objects.annotate(
+        has_open=Exists(open_details),
+        min_due=Min('detalleprestamo__fecha_vencimiento', 
+                    filter=Q(detalleprestamo__fecha_devolucion_real__isnull=True))
+    )
+    
+    # Préstamos activos (no vencidos)
+    prestamos_activos = prestamos_con_abiertos.filter(
+        has_open=True,
+        min_due__gte=today
+    ).count()
+    
+    # 3. Préstamos vencidos (retrasados)
+    prestamos_vencidos = prestamos_con_abiertos.filter(
+        has_open=True,
+        min_due__lt=today
+    ).count()
+    
+    # 4. Usuarios registrados
+    usuarios_registrados = Usuarios.objects.count()
+    
+    # 5. Top 5 préstamos vencidos (más antiguos primero)
+    detalles_vencidos = DetallePrestamo.objects.filter(
+        fecha_devolucion_real__isnull=True,
+        fecha_vencimiento__lt=today
+    ).select_related(
+        'id_prestamo__id_usuario',
+        'id_ejemplar__id_documento'
+    ).order_by('fecha_vencimiento')[:5]
+    
+    prestamos_vencidos_list = []
+    for detalle in detalles_vencidos:
+        dias_vencido = (today - detalle.fecha_vencimiento).days
+        usuario = detalle.id_prestamo.id_usuario
+        documento = detalle.id_ejemplar.id_documento
+        prestamos_vencidos_list.append({
+            'titulo': documento.titulo,
+            'usuario': f"{usuario.nombre} {usuario.apellido}",
+            'dias': dias_vencido
+        })
+    
+    # 6. Inventario crítico (documentos sin ejemplares disponibles)
+    # Subconsulta para contar préstamos activos por ejemplar
+    prestamos_activos_sub = DetallePrestamo.objects.filter(
+        id_ejemplar_id=OuterRef('pk'),
+        fecha_devolucion_real__isnull=True
+    ).values('id_ejemplar_id').annotate(c=Count('id_ejemplar_id')).values('c')
+    
+    # Ejemplares con disponibilidad calculada
+    ejemplares_con_disp = Ejemplares.objects.exclude(
+        id_estado_ejemplar__nombre_estado__icontains='ELIMIN'
+    ).exclude(unidad_fisica=0).annotate(
+        prestados=Coalesce(Subquery(prestamos_activos_sub, output_field=IntegerField()), Value(0)),
+        disponibles=F('unidad_fisica') - F('prestados')
+    )
+    
+    # Agrupar por documento y sumar disponibles
+    docs_sin_stock = ejemplares_con_disp.values(
+        'id_documento_id'
+    ).annotate(
+        total_disponibles=Sum('disponibles')
+    ).filter(
+        total_disponibles=0
+    ).values_list('id_documento_id', flat=True)[:5]
+    
+    # Obtener información de documentos sin stock
+    inventario_critico = []
+    for doc_id in docs_sin_stock:
+        try:
+            doc = Documentos.objects.get(id_documento=doc_id)
+            # Obtener primer autor
+            autor_rel = DocumentoAutores.objects.filter(id_documento=doc).select_related('id_autor').first()
+            autor = f"{autor_rel.id_autor.nombre} {autor_rel.id_autor.apellido}" if autor_rel else "Autor desconocido"
+            inventario_critico.append({
+                'titulo': doc.titulo,
+                'autor': autor
+            })
+        except Documentos.DoesNotExist:
+            continue
+    
+    context = {
+        'active_page': 'dashboard',
+        'total_documentos': total_documentos,
+        'total_items': total_items,
+        'prestamos_activos': prestamos_activos,
+        'prestamos_vencidos': prestamos_vencidos,
+        'usuarios_registrados': usuarios_registrados,
+        'prestamos_vencidos_list': prestamos_vencidos_list,
+        'inventario_critico': inventario_critico,
+    }
+    
+    return render(request, 'dashboard.html', context)
 
 
 @ensure_csrf_cookie
@@ -1337,3 +1452,61 @@ def prestamos_gestion_page(request):
 def prestamos_registrar_page(request):
     # Render-only: el front enviará POST al API (o mock) vía JS
     return render(request, 'prestamos_registrar.html', {'active_page': 'prestamos'})
+
+
+@ensure_csrf_cookie
+@login_required(login_url='login')
+def usuarios_gestion_page(request):
+    """Vista de gestión de usuarios"""
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
+    
+    from django.contrib.auth.models import User
+    
+    # Obtener todos los usuarios de la tabla de dominio
+    usuarios_list = Usuarios.objects.select_related('id_rol').all().order_by('id_usuario')
+    
+    # Obtener IDs de usuarios con login
+    usuarios_con_login = set(User.objects.values_list('id', flat=True))
+    
+    # Calcular préstamos activos y vencidos por usuario
+    today = timezone.now().date()
+    
+    usuarios_data = []
+    for usuario in usuarios_list:
+        # Préstamos del usuario
+        prestamos_usuario = Prestamos.objects.filter(id_usuario=usuario)
+        
+        # Préstamos activos (con detalles sin devolver)
+        prestamos_activos = prestamos_usuario.filter(
+            detalleprestamo__fecha_devolucion_real__isnull=True
+        ).distinct().count()
+        
+        # Préstamos vencidos (activos con fecha vencida)
+        prestamos_vencidos = prestamos_usuario.filter(
+            detalleprestamo__fecha_devolucion_real__isnull=True,
+            detalleprestamo__fecha_vencimiento__lt=today
+        ).distinct().count()
+        
+        usuarios_data.append({
+            'id_usuario': usuario.id_usuario,
+            'nombre': usuario.nombre,
+            'apellido': usuario.apellido,
+            'email': usuario.email,
+            'id_rol': usuario.id_rol,
+            'tiene_login': usuario.id_usuario in usuarios_con_login,
+            'tipo': 'con_login' if usuario.id_usuario in usuarios_con_login else 'sin_login',
+            'prestamos_activos': prestamos_activos,
+            'prestamos_vencidos': prestamos_vencidos,
+        })
+    
+    # Obtener roles para el filtro
+    roles = Roles.objects.all()
+    
+    context = {
+        'active_page': 'usuarios',
+        'usuarios': usuarios_data,
+        'roles': roles,
+    }
+    
+    return render(request, 'usuarios_gestion.html', context)
