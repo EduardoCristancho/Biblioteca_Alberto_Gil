@@ -321,12 +321,71 @@
         const id = a.getAttribute('data-id');
         const tomo = a.getAttribute('data-tomo');
         if(action === 'eliminar'){
-          const conf = await Swal.fire({icon:'warning', title:'Eliminar documento', text:'¿Desea eliminar este documento?', showCancelButton:true, confirmButtonText:'Sí, eliminar'});
+          const conf = await Swal.fire({
+            icon:'warning', 
+            title:'Eliminar documento', 
+            text:'¿Está seguro de que desea eliminar este documento? Esta acción no se puede deshacer.', 
+            showCancelButton:true, 
+            confirmButtonText:'Sí, eliminar',
+            cancelButtonText:'Cancelar',
+            confirmButtonColor:'#d33'
+          });
           if(conf.isConfirmed){
-            const resp = await csrfFetch(`/api/documentos/${id}/delete`, {method:'DELETE'});
-            if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return;}
-            Swal.fire({icon:'success', title:'Eliminado'});
-            buscar();
+            try {
+              const resp = await csrfFetch(`/api/documentos/${id}/delete`, {method:'DELETE'});
+              
+              if(!resp.ok){
+                let errorData = {};
+                let errorMessage = 'No se pudo eliminar el documento';
+                
+                try {
+                  errorData = await resp.json();
+                } catch(e) {
+                  // Si no se puede parsear JSON, usar mensaje genérico basado en status
+                }
+                
+                if(resp.status === 409) {
+                  errorMessage = errorData.detail || 'El documento tiene préstamos activos y no puede ser eliminado';
+                } else if(resp.status === 403) {
+                  errorMessage = errorData.detail || 'No tiene permisos para eliminar documentos';
+                } else if(resp.status === 404) {
+                  errorMessage = 'El documento no existe o ya fue eliminado';
+                } else if(resp.status === 500) {
+                  errorMessage = 'Error interno del servidor. Contacte al administrador.';
+                } else if(errorData.detail) {
+                  errorMessage = errorData.detail;
+                }
+                
+                Swal.fire({
+                  icon:'error', 
+                  title:'Error al eliminar', 
+                  text: errorMessage
+                }); 
+                return;
+              }
+              
+              const result = await resp.json().catch(() => ({}));
+              const titulo = result.titulo || 'el documento';
+              
+              Swal.fire({
+                icon:'success', 
+                title:'Documento eliminado', 
+                text: `"${titulo}" ha sido eliminado correctamente`,
+                timer: 3000,
+                timerProgressBar: true
+              });
+              
+              // Recargar la lista para reflejar los cambios
+              buscar();
+              
+            } catch(error) {
+              console.error('Error eliminando documento:', error);
+              Swal.fire({
+                icon:'error', 
+                title:'Error de conexión', 
+                text:'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.'
+              });
+            }
           }
         } else if(action === 'editar'){
           try{
@@ -638,12 +697,68 @@
         document.querySelectorAll('.ej-eliminar').forEach(btn => {
           btn.addEventListener('click', async () => {
             const eid = btn.getAttribute('data-eid');
-            const conf = await Swal.fire({icon:'warning', title:'Eliminar ejemplar', showCancelButton:true});
+            const conf = await Swal.fire({
+              icon:'warning', 
+              title:'Eliminar ejemplar', 
+              text:'¿Está seguro de que desea eliminar este ejemplar?',
+              showCancelButton:true,
+              confirmButtonText:'Sí, eliminar',
+              cancelButtonText:'Cancelar',
+              confirmButtonColor:'#d33'
+            });
             if(!conf.isConfirmed) return;
-            const resp = await csrfFetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
-            if(!resp.ok){ Swal.fire({icon:'error', title:'Error', text:'No se pudo eliminar'}); return; }
-            Swal.fire({icon:'success', title:'Ejemplar eliminado'});
-            buscar();
+            
+            try {
+              const resp = await csrfFetch(`/api/ejemplares/${eid}`, {method:'DELETE'});
+              
+              if(!resp.ok){ 
+                let errorData = {};
+                let errorMessage = 'No se pudo eliminar el ejemplar';
+                
+                try {
+                  errorData = await resp.json();
+                } catch(e) {
+                  // Si no se puede parsear JSON, usar mensaje genérico basado en status
+                }
+                
+                if(resp.status === 409) {
+                  errorMessage = errorData.detail || 'El ejemplar tiene préstamos activos y no puede ser eliminado';
+                } else if(resp.status === 404) {
+                  errorMessage = 'El ejemplar no existe o ya fue eliminado';
+                } else if(resp.status === 500) {
+                  errorMessage = 'Error interno del servidor. Contacte al administrador.';
+                } else if(errorData.detail) {
+                  errorMessage = errorData.detail;
+                }
+                
+                Swal.fire({
+                  icon:'error', 
+                  title:'Error al eliminar', 
+                  text: errorMessage
+                }); 
+                return; 
+              }
+              
+              Swal.fire({
+                icon:'success', 
+                title:'Ejemplar eliminado',
+                text:'El ejemplar ha sido eliminado correctamente',
+                timer: 2000,
+                timerProgressBar: true
+              });
+              
+              // Cerrar el modal y recargar la lista
+              Swal.close();
+              buscar();
+              
+            } catch(error) {
+              console.error('Error eliminando ejemplar:', error);
+              Swal.fire({
+                icon:'error', 
+                title:'Error de conexión', 
+                text:'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.'
+              });
+            }
           });
         });
       }

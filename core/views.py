@@ -26,7 +26,7 @@ from .serializers import (
 )
 from .models import (
     Autores, Ubicaciones, Carreras, Documentos, Usuarios,
-    Prestamos, DetallePrestamo, Ejemplares, Roles, EstadosEjemplar, LibroDetalle, DocumentoAcademico, DocumentoAutores
+    Prestamos, DetallePrestamo, Ejemplares, Roles, EstadosEjemplar, LibroDetalle, DocumentoAcademico, DocumentoAutores, InformePasantiaDetalle
 )
 from .filters import DocumentoFilter
 
@@ -704,9 +704,79 @@ class DocumentoDeleteView(generics.DestroyAPIView):
     queryset = Documentos.objects.all()
 
     def delete(self, request, *args, **kwargs):
-        # No hay columna deleted_at en el esquema actual; respondemos 200 sin borrar físicamente.
         instance = self.get_object()
-        return Response({'status': 'soft-delete-simulado', 'id_documento': instance.pk}, status=status.HTTP_200_OK)
+        
+        # Verificar permisos de administrador
+        if not _is_admin_user(request.user):
+            return Response({
+                'detail': 'No tiene permisos para eliminar documentos'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Verificar si hay préstamos activos para este documento
+        prestamos_activos = DetallePrestamo.objects.filter(
+            id_ejemplar__id_documento=instance,
+            fecha_devolucion_real__isnull=True
+        ).exists()
+        
+        if prestamos_activos:
+            return Response({
+                'detail': 'No se puede eliminar el documento porque tiene préstamos activos'
+            }, status=status.HTTP_409_CONFLICT)
+        
+        with transaction.atomic():
+            documento_id = instance.id_documento
+            titulo = instance.titulo
+            
+            # 1. Obtener todos los ejemplares del documento
+            ejemplares = Ejemplares.objects.filter(id_documento=instance)
+            ejemplar_ids = list(ejemplares.values_list('id_ejemplar', flat=True))
+            
+            # 2. Eliminar detalles de préstamos históricos (ya concluidos)
+            if ejemplar_ids:
+                DetallePrestamo.objects.filter(
+                    id_ejemplar_id__in=ejemplar_ids
+                ).delete()
+            
+            # 3. Eliminar ejemplares (ahora sin referencias FK)
+            ejemplares.delete()
+            
+            # 4. Eliminar relaciones con autores
+            DocumentoAutores.objects.filter(id_documento=instance).delete()
+            
+            # 5. Eliminar detalles específicos del documento
+            try:
+                if hasattr(instance, 'documentoacademico'):
+                    instance.documentoacademico.delete()
+            except DocumentoAcademico.DoesNotExist:
+                pass
+            
+            try:
+                if hasattr(instance, 'librodetalle'):
+                    instance.librodetalle.delete()
+            except LibroDetalle.DoesNotExist:
+                pass
+            
+            try:
+                if hasattr(instance, 'informepasantiadetalle'):
+                    instance.informepasantiadetalle.delete()
+            except:
+                pass
+            
+            # 6. Eliminar el documento principal
+            instance.delete()
+            
+            # Auditoría
+            uid = getattr(getattr(request, 'user', None), 'id', None)
+            logger.info(
+                'Documento eliminado: id=%s, titulo=%s, user=%s, ejemplares=%s', 
+                documento_id, titulo, uid, len(ejemplar_ids)
+            )
+        
+        return Response({
+            'status': 'documento-eliminado', 
+            'id_documento': documento_id,
+            'titulo': titulo
+        }, status=status.HTTP_200_OK)
 
 
 # Ejemplares (update/delete)
@@ -746,6 +816,18 @@ class EjemplarUpdateDeleteView(generics.GenericAPIView):
             e = Ejemplares.objects.select_related('id_estado_ejemplar').get(pk=ejemplar_id)
         except Ejemplares.DoesNotExist:
             return Response({'detail': 'Ejemplar no existe'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verificar si el ejemplar tiene préstamos activos
+        prestamos_activos = DetallePrestamo.objects.filter(
+            id_ejemplar=e,
+            fecha_devolucion_real__isnull=True
+        ).exists()
+        
+        if prestamos_activos:
+            return Response({
+                'detail': 'No se puede eliminar el ejemplar porque tiene préstamos activos'
+            }, status=status.HTTP_409_CONFLICT)
+        
         # Soft delete: cambiar estado a ELIMINADO (si existe) y poner unidad_fisica=0
         eliminado = EstadosEjemplar.objects.filter(nombre_estado__iexact='ELIMINADO').first()
         if eliminado:
@@ -960,30 +1042,63 @@ class PrestamoListCreateView(generics.GenericAPIView):
             qs = qs.filter(id_usuario_id=int(s))
 
         if chip_titulos or chip_autores or chip_cotas:
-            qs = qs.annotate(
-                chip_titulo_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__titulo')),
-                chip_cota_n=_normalize_expr(F('detalleprestamo__id_ejemplar__codigo_cota')),
-                chip_autor_nom_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__documentoautores__id_autor__nombre')),
-                chip_autor_ape_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__documentoautores__id_autor__apellido')),
-            )
-            for t in chip_titulos:
-                tn = _normalize_text(t)
-                if tn:
-                    qs = qs.filter(chip_titulo_n__contains=tn)
-            for c in chip_cotas:
-                cn = _normalize_text(c)
-                if cn:
-                    qs = qs.filter(chip_cota_n__contains=cn)
-            for a in chip_autores:
-                an = _normalize_text(a)
-                if not an:
-                    continue
-                # Permitir búsquedas como "Gabriel Garcia" (tokens) además de "Garcia"
-                tokens = [t for t in an.split(' ') if t]
-                for tok in tokens:
-                    qs = qs.filter(Q(chip_autor_nom_n__contains=tok) | Q(chip_autor_ape_n__contains=tok))
-
-            qs = qs.distinct()
+            # Usar subquery para evitar duplicados por múltiples joins
+            prestamo_ids_filtrados = set()
+            
+            # Filtrar por títulos
+            if chip_titulos:
+                for t in chip_titulos:
+                    tn = _normalize_text(t)
+                    if tn:
+                        ids = Prestamos.objects.annotate(
+                            chip_titulo_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__titulo'))
+                        ).filter(chip_titulo_n__contains=tn).values_list('id_prestamo', flat=True)
+                        if not prestamo_ids_filtrados:
+                            prestamo_ids_filtrados = set(ids)
+                        else:
+                            prestamo_ids_filtrados &= set(ids)
+            
+            # Filtrar por cotas
+            if chip_cotas:
+                for c in chip_cotas:
+                    cn = _normalize_text(c)
+                    if cn:
+                        ids = Prestamos.objects.annotate(
+                            chip_cota_n=_normalize_expr(F('detalleprestamo__id_ejemplar__codigo_cota'))
+                        ).filter(chip_cota_n__contains=cn).values_list('id_prestamo', flat=True)
+                        if not prestamo_ids_filtrados:
+                            prestamo_ids_filtrados = set(ids)
+                        else:
+                            prestamo_ids_filtrados &= set(ids)
+            
+            # Filtrar por autores
+            if chip_autores:
+                for a in chip_autores:
+                    an = _normalize_text(a)
+                    if not an:
+                        continue
+                    tokens = [t for t in an.split(' ') if t]
+                    autor_ids = None
+                    for tok in tokens:
+                        ids = Prestamos.objects.annotate(
+                            chip_autor_nom_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__documentoautores__id_autor__nombre')),
+                            chip_autor_ape_n=_normalize_expr(F('detalleprestamo__id_ejemplar__id_documento__documentoautores__id_autor__apellido'))
+                        ).filter(
+                            Q(chip_autor_nom_n__contains=tok) | Q(chip_autor_ape_n__contains=tok)
+                        ).values_list('id_prestamo', flat=True)
+                        if autor_ids is None:
+                            autor_ids = set(ids)
+                        else:
+                            autor_ids &= set(ids)
+                    if autor_ids is not None:
+                        if not prestamo_ids_filtrados:
+                            prestamo_ids_filtrados = autor_ids
+                        else:
+                            prestamo_ids_filtrados &= autor_ids
+            
+            # Aplicar filtro de IDs
+            if prestamo_ids_filtrados:
+                qs = qs.filter(id_prestamo__in=prestamo_ids_filtrados)
 
         qs = qs.order_by('-fecha_prestamo', '-id_prestamo')
 
