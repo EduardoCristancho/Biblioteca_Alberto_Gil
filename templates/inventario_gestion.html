@@ -39,6 +39,11 @@
                 </select>
             </div>
             <div class="filter-item">
+                <select id="inv-carrera">
+                    <option value="">Carrera: Todas las carreras</option>
+                </select>
+            </div>
+            <div class="filter-item">
                 <select id="inv-estado">
                     <option value="">Estado de Préstamo: Todos los estados</option>
                     <option value="disponible">Disponible</option>
@@ -163,6 +168,7 @@
     const chipInput = document.getElementById('chip-input');
     const chipList = document.getElementById('chip-list');
     const selTipo = document.getElementById('inv-tipo');
+    const selCarrera = document.getElementById('inv-carrera');
     const selEstado = document.getElementById('inv-estado');
     const selStock = document.getElementById('inv-stock');
     const tbody = document.getElementById('inv-tbody');
@@ -816,8 +822,10 @@
     const estado = (selEstado?.value || '').trim();
     const stock = (selStock?.value || '').trim();
     const tipo = (selTipo?.value || '').trim();
+    const carrera = (selCarrera?.value || '').trim();
 
     if(tipo) params.set('tipo_doc', tipo);
+    if(carrera) params.set('carrera', carrera);
     if(estado) params.set('inv_estado', estado);
     if(stock) params.set('inv_stock', stock);
 
@@ -888,8 +896,30 @@
     onFilterChange();
   });
   if (selTipo) selTipo.addEventListener('change', onFilterChange);
+  if (selCarrera) selCarrera.addEventListener('change', onFilterChange);
   if (selEstado) selEstado.addEventListener('change', onFilterChange);
   if (selStock) selStock.addEventListener('change', onFilterChange);
+  
+  // Cargar carreras al inicio
+  (async function loadCarreras(){
+    try {
+      const resp = await fetch('/api/carreras/');
+      if(!resp.ok) return;
+      const data = await resp.json();
+      const carreras = Array.isArray(data) ? data : (data.results || []);
+      if(selCarrera && carreras.length > 0){
+        carreras.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id_carrera;
+          opt.textContent = c.nombre_carrera;
+          selCarrera.appendChild(opt);
+        });
+      }
+    } catch(e) {
+      console.error('Error cargando carreras:', e);
+    }
+  })();
+  
   renderChips();
   buscar();
 })();

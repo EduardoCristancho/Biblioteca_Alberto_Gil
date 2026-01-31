@@ -992,6 +992,7 @@ class PrestamoListCreateView(generics.GenericAPIView):
         # Filtros
         estado = request.GET.get('estado')  # activo | concluido | retrasado
         tipo_usuario = request.GET.get('tipo_usuario')  # estudiante | profesor | bibliotecario | administrador | id rol
+        carrera = request.GET.get('carrera')  # id de carrera
         fecha_ini = request.GET.get('fecha_inicio')
         fecha_fin = request.GET.get('fecha_fin')
         id_documento = request.GET.get('id_documento')
@@ -1026,6 +1027,12 @@ class PrestamoListCreateView(generics.GenericAPIView):
                     qs = qs.annotate(
                         rol_n=_normalize_expr(F('id_usuario__id_rol__nombre_rol')),
                     ).filter(rol_n__contains=tipo_n)
+
+        if carrera:
+            # Filtrar préstamos que incluyen documentos de la carrera especificada
+            qs = qs.filter(
+                detalleprestamo__id_ejemplar__id_documento__id_carrera_id=carrera
+            ).distinct()
 
         if fecha_ini:
             qs = qs.filter(fecha_prestamo__date__gte=fecha_ini)

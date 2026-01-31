@@ -47,6 +47,11 @@
                     </select>
                 </div>
                 <div class="filter-item">
+                    <select id="loan-carrera">
+                        <option value="">Carrera: Todas las carreras</option>
+                    </select>
+                </div>
+                <div class="filter-item">
                     <input type="date" id="loan-fecha-inicio">
                     <small style="display:block; margin-top:5px; color:var(--text-light);">Fecha inicio</small>
                 </div>
@@ -95,6 +100,7 @@
 
   const estadoEl = document.getElementById('loan-estado');
   const tipoEl = document.getElementById('loan-tipo');
+  const carreraEl = document.getElementById('loan-carrera');
   const fechaIniEl = document.getElementById('loan-fecha-inicio');
   const fechaFinEl = document.getElementById('loan-fecha-fin');
 
@@ -165,11 +171,13 @@
     const params = new URLSearchParams();
     const estado = (estadoEl.value || '').trim();
     const tipo = (tipoEl.value || '').trim();
+    const carrera = (carreraEl.value || '').trim();
     const f1 = (fechaIniEl.value || '').trim();
     const f2 = (fechaFinEl.value || '').trim();
 
     if(estado) params.set('estado', estado);
     if(tipo) params.set('tipo_usuario', tipo);
+    if(carrera) params.set('carrera', carrera);
     if(f1) params.set('fecha_inicio', f1);
     if(f2) params.set('fecha_fin', f2);
 
@@ -609,8 +617,29 @@
 
   estadoEl.addEventListener('change', onFilterChange);
   tipoEl.addEventListener('change', onFilterChange);
+  carreraEl.addEventListener('change', onFilterChange);
   fechaIniEl.addEventListener('change', onFilterChange);
   fechaFinEl.addEventListener('change', onFilterChange);
+
+  // Cargar carreras al inicio
+  (async function loadCarreras(){
+    try {
+      const resp = await fetch('/api/carreras/');
+      if(!resp.ok) return;
+      const data = await resp.json();
+      const carreras = Array.isArray(data) ? data : (data.results || []);
+      if(carreraEl && carreras.length > 0){
+        carreras.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id_carrera;
+          opt.textContent = c.nombre_carrera;
+          carreraEl.appendChild(opt);
+        });
+      }
+    } catch(e) {
+      console.error('Error cargando carreras:', e);
+    }
+  })();
 
   renderChips();
   fetchPrestamos();
