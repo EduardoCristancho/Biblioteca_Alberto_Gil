@@ -1564,6 +1564,24 @@ def inventario_registrar_page(request):
 
 @ensure_csrf_cookie
 @login_required(login_url='login')
+def inventario_registrar_libro_page(request):
+    # Render-only: página específica para registrar libros
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
+    return render(request, 'inventario_registrar_libro.html', {'active_page': 'inventario'})
+
+
+@ensure_csrf_cookie
+@login_required(login_url='login')
+def inventario_registrar_tesis_page(request):
+    # Render-only: página específica para registrar tesis
+    if not _is_admin_user(request.user):
+        return redirect('gestion_prestamos')
+    return render(request, 'inventario_registrar_tesis.html', {'active_page': 'inventario'})
+
+
+@ensure_csrf_cookie
+@login_required(login_url='login')
 def prestamos_gestion_page(request):
     # Render-only: el front consumirá el API (o mock) vía JS
     return render(request, 'prestamos_gestion.html', {'active_page': 'prestamos'})

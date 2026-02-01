@@ -1,40 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Registrar Nuevo Ejemplar{% endblock %}
+{% block title %}Registrar Nuevo Libro{% endblock %}
 
 {% block content %}
     <div class="form-header">
         <a href="{% url 'gestion_inventario' %}">
             <i class="fa-solid fa-arrow-left"></i>
-            Registrar Nuevo Ejemplar
+            Registrar Nuevo Libro
         </a>
-        <p>Ingrese la información completa del nuevo ítem para el catálogo</p>
+        <p>Ingrese la información completa del libro para el catálogo</p>
     </div>
 
-    <form class="form-card" id="inv-reg-form">
-        <div class="form-section-title" style="color: var(--text-dark);">Tipo de Ítem</div>
-        <div class="radio-group" id="tipo-toggle">
-            <div class="radio-option selected" data-tipo="LIBRO" data-tipo-id="1">
-                <div class="icon-title">
-                    <i class="fa-solid fa-book-bookmark"></i>
-                    Libro
-                </div>
-                <p>Libros de texto, literatura, manuales técnicos</p>
-            </div>
-            <div class="radio-option" data-tipo="TESIS" data-tipo-id="2">
-                <div class="icon-title">
-                    <i class="fa-solid fa-graduation-cap"></i>
-                    Tesis
-                </div>
-                <p>Tesis de pregrado, posgrado y trabajos de investigación</p>
-            </div>
-        </div>
-
+    <form class="form-card" id="inv-reg-form" style="max-width: 900px; margin: 0 auto;">
         <input type="hidden" id="doc-id" value="">
+        <input type="hidden" id="tipo-documento" value="LIBRO">
+        <input type="hidden" id="tipo-documento-id" value="1">
 
         <div class="form-section-title">
-            <i class="fa-solid fa-circle-info"></i>
-            Información Básica
+            <i class="fa-solid fa-book-bookmark" style="color: var(--primary-color);"></i>
+            Información del Libro
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -67,13 +51,9 @@
         </div>
 
         <div class="form-row">
-            <div class="form-group" id="grupo-area">
+            <div class="form-group">
                 <label for="area">Área de Conocimiento *</label>
                 <select id="area" placeholder="Buscar área..."></select>
-            </div>
-            <div class="form-group" id="grupo-tutor" style="display:none;">
-                <label for="tutor">Tutor Académico *</label>
-                <select id="tutor" placeholder="Buscar tutor..."></select>
             </div>
         </div>
 
@@ -159,9 +139,6 @@
   const carreraEl = document.getElementById('carrera');
   const autorEl = document.getElementById('autor');
   const areaEl = document.getElementById('area');
-  const tutorEl = document.getElementById('tutor');
-  const grupoArea = document.getElementById('grupo-area');
-  const grupoTutor = document.getElementById('grupo-tutor');
 
   const fechaEl = document.getElementById('fecha');
 
@@ -187,7 +164,6 @@
   let tsAutor = null;
   let tsCarrera = null;
   let tsArea = null;
-  let tsTutor = null;
   let tsEjEstado = null;
   let tsEjUbic = null;
 
@@ -285,10 +261,6 @@
     if(tsAutor) lockedDoc ? tsAutor.disable() : tsAutor.enable();
     if(tsCarrera) lockedDoc ? tsCarrera.disable() : tsCarrera.enable();
     if(tsArea) lockedDoc ? tsArea.disable() : tsArea.enable();
-    if(tsTutor) lockedDoc ? tsTutor.disable() : tsTutor.enable();
-
-    tipoToggle.style.pointerEvents = lockedDoc ? 'none' : '';
-    tipoToggle.style.opacity = lockedDoc ? '0.6' : '';
 
     btnReset.style.display = lockedDoc ? '' : 'none';
     if(lockedDoc) clearTituloResults();
@@ -299,13 +271,6 @@
     if(!lockedDoc){
       docIdEl.value = '';
       docHintEl.textContent = '';
-    }
-    if(tipo === 'TESIS'){
-      grupoArea.style.display = 'none';
-      grupoTutor.style.display = '';
-    } else {
-      grupoArea.style.display = '';
-      grupoTutor.style.display = 'none';
     }
   }
 
@@ -360,10 +325,6 @@
     if(doc.area_de_conocimiento && tsArea){
       tsArea.addOption({value: doc.area_de_conocimiento, text: doc.area_de_conocimiento});
       tsArea.setValue(doc.area_de_conocimiento, true);
-    }
-    if(doc.tutor_academico && tsTutor){
-      tsTutor.addOption({value: doc.tutor_academico, text: doc.tutor_academico});
-      tsTutor.setValue(doc.tutor_academico, true);
     }
 
     setLockedState(true);
@@ -705,48 +666,8 @@
           setTimeout(verificarYGenerarCota, 100);
         }
       });
-
-      const tutorCache = new Map();
-      const tutorCanon = new Map();
-      tsTutor = new TomSelect(tutorEl, {
-        create: (input) => {
-          const raw = String(input || '').trim();
-          const k = normalizeText(raw);
-          const canon = tutorCanon.get(k);
-          return {value: canon || raw, text: canon || raw};
-        },
-        valueField:'value',
-        labelField:'text',
-        searchField:['text'],
-        load: async (query, callback) => {
-          const q = (query||'').trim();
-          if(q.length < 2) return callback();
-          const qn = normalizeText(q);
-          if(tutorCache.has(qn)) return callback(tutorCache.get(qn));
-          try{
-            const items = await fetchJson(`/api/sugerencias/tutores?search=${encodeURIComponent(q)}`);
-            const opts = (items||[]).map(x => {
-              const k = normalizeText(x);
-              if(k && !tutorCanon.has(k)) tutorCanon.set(k, x);
-              return {value: x, text: x};
-            });
-            tutorCache.set(qn, opts);
-            callback(opts);
-          }catch(e){
-            callback();
-          }
-        }
-      });
     }
   }
-
-  tipoToggle.querySelectorAll('.radio-option').forEach(opt => {
-    opt.addEventListener('click', ()=>{
-      tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-      opt.classList.add('selected');
-      setTipo(opt.getAttribute('data-tipo'), parseInt(opt.getAttribute('data-tipo-id'), 10));
-    });
-  });
 
   let t;
   tituloEl.addEventListener('input', ()=>{
@@ -858,13 +779,11 @@
       const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value||'');
       const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value||'');
       const area = tsArea ? tsArea.getValue() : (areaEl.value||'');
-      const tutor = tsTutor ? tsTutor.getValue() : (tutorEl.value||'');
 
       if(!titulo){ await swalWarn('Título requerido'); return; }
       if(!fecha){ await swalWarn('Fecha requerida'); return; }
       if(!autorId){ await swalWarn('Autor requerido'); return; }
-      if(tipoActual.tipo === 'LIBRO' && !area){ await swalWarn('Área de conocimiento requerida'); return; }
-      if(tipoActual.tipo === 'TESIS' && !tutor){ await swalWarn('Tutor académico requerido'); return; }
+      if(!area){ await swalWarn('Área de conocimiento requerida'); return; }
       if(!ejemplaresLocal.length){ await swalWarn('Agrega al menos un ejemplar'); return; }
 
       let finalDocId = docId;
@@ -875,8 +794,8 @@
           fecha_publicacion: fecha,
           id_carrera: carreraId ? parseInt(carreraId, 10) : null,
           autores_ids: [parseInt(autorId, 10)],
-          tutor_academico: tipoActual.tipo === 'TESIS' ? tutor : null,
-          area_de_conocimiento: tipoActual.tipo === 'LIBRO' ? area : null,
+          tutor_academico: null,
+          area_de_conocimiento: area,
         };
         const resp = await csrfFetch('/api/documentos/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadDoc)});
         if(!resp.ok){
@@ -924,7 +843,6 @@
     if(tsAutor) tsAutor.clear(true);
     if(tsCarrera) tsCarrera.clear(true);
     if(tsArea) tsArea.clear(true);
-    if(tsTutor) tsTutor.clear(true);
 
     ejemplaresLocal = [];
     ejCotaEl.value = '';
@@ -938,28 +856,6 @@
   setTipo('LIBRO', 1);
   initSelects();
   renderEjemplares();
-  
-  // Detectar parámetro de tipo en la URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const tipoParam = urlParams.get('tipo');
-  if (tipoParam) {
-    const tipoUpper = tipoParam.toUpperCase();
-    if (tipoUpper === 'LIBRO') {
-      const libroOption = tipoToggle.querySelector('[data-tipo="LIBRO"]');
-      if (libroOption) {
-        tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-        libroOption.classList.add('selected');
-        setTipo('LIBRO', 1);
-      }
-    } else if (tipoUpper === 'TESIS') {
-      const tesisOption = tipoToggle.querySelector('[data-tipo="TESIS"]');
-      if (tesisOption) {
-        tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-        tesisOption.classList.add('selected');
-        setTipo('TESIS', 2);
-      }
-    }
-  }
 })();
 </script>
 {% endblock %}

@@ -46,11 +46,15 @@
                             Dashboard
                         </a>
                     </li>
-                    <li class="nav-item {% if active_page == 'inventario' %}active{% endif %}">
+                    <li class="nav-item nav-item-with-submenu {% if active_page == 'inventario' %}active{% endif %}">
                         <a href="{% url 'gestion_inventario' %}">
                             <i class="fa-solid fa-box-archive"></i>
                             Gestión de Inventario
                         </a>
+                        <ul class="submenu">
+                            <li><a href="{% url 'registrar_libro' %}"><i class="fa-solid fa-book-bookmark"></i> Agregar Libro</a></li>
+                            <li><a href="{% url 'registrar_tesis' %}"><i class="fa-solid fa-graduation-cap"></i> Agregar Tesis</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item {% if active_page == 'prestamos' %}active{% endif %}">
                         <a href="{% url 'gestion_prestamos' %}">

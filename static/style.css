@@ -97,6 +97,50 @@ a {
     color: var(--bg-card);
 }
 
+/* --- Submenu Styles --- */
+.nav-item-with-submenu {
+    position: relative;
+}
+
+.submenu {
+    list-style: none;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    margin-top: 5px;
+}
+
+.nav-item-with-submenu:hover .submenu {
+    max-height: 200px;
+    opacity: 1;
+}
+
+.submenu li {
+    margin-bottom: 5px;
+}
+
+.submenu li a {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px 10px 45px;
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.submenu li a i {
+    margin-right: 10px;
+    font-size: 16px;
+}
+
+.submenu li a:hover {
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
+    padding-left: 50px;
+}
+
 /* --- Main Content --- */
 .main-content {
     margin-left: 280px;

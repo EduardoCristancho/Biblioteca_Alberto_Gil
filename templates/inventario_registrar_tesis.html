@@ -1,40 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Registrar Nuevo Ejemplar{% endblock %}
+{% block title %}Registrar Nueva Tesis{% endblock %}
 
 {% block content %}
     <div class="form-header">
         <a href="{% url 'gestion_inventario' %}">
             <i class="fa-solid fa-arrow-left"></i>
-            Registrar Nuevo Ejemplar
+            Registrar Nueva Tesis
         </a>
-        <p>Ingrese la información completa del nuevo ítem para el catálogo</p>
+        <p>Ingrese la información completa de la tesis para el catálogo</p>
     </div>
 
-    <form class="form-card" id="inv-reg-form">
-        <div class="form-section-title" style="color: var(--text-dark);">Tipo de Ítem</div>
-        <div class="radio-group" id="tipo-toggle">
-            <div class="radio-option selected" data-tipo="LIBRO" data-tipo-id="1">
-                <div class="icon-title">
-                    <i class="fa-solid fa-book-bookmark"></i>
-                    Libro
-                </div>
-                <p>Libros de texto, literatura, manuales técnicos</p>
-            </div>
-            <div class="radio-option" data-tipo="TESIS" data-tipo-id="2">
-                <div class="icon-title">
-                    <i class="fa-solid fa-graduation-cap"></i>
-                    Tesis
-                </div>
-                <p>Tesis de pregrado, posgrado y trabajos de investigación</p>
-            </div>
-        </div>
-
+    <form class="form-card" id="inv-reg-form" style="max-width: 900px; margin: 0 auto;">
         <input type="hidden" id="doc-id" value="">
+        <input type="hidden" id="tipo-documento" value="TESIS">
+        <input type="hidden" id="tipo-documento-id" value="2">
 
         <div class="form-section-title">
-            <i class="fa-solid fa-circle-info"></i>
-            Información Básica
+            <i class="fa-solid fa-graduation-cap" style="color: var(--primary-color);"></i>
+            Información de la Tesis
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -67,11 +51,7 @@
         </div>
 
         <div class="form-row">
-            <div class="form-group" id="grupo-area">
-                <label for="area">Área de Conocimiento *</label>
-                <select id="area" placeholder="Buscar área..."></select>
-            </div>
-            <div class="form-group" id="grupo-tutor" style="display:none;">
+            <div class="form-group">
                 <label for="tutor">Tutor Académico *</label>
                 <select id="tutor" placeholder="Buscar tutor..."></select>
             </div>
@@ -158,10 +138,7 @@
 
   const carreraEl = document.getElementById('carrera');
   const autorEl = document.getElementById('autor');
-  const areaEl = document.getElementById('area');
   const tutorEl = document.getElementById('tutor');
-  const grupoArea = document.getElementById('grupo-area');
-  const grupoTutor = document.getElementById('grupo-tutor');
 
   const fechaEl = document.getElementById('fecha');
 
@@ -181,12 +158,11 @@
 
   let catalogsPromise = null;
   let catalogsCache = null;
-  let tipoActual = {tipo: 'LIBRO', tipoId: 1};
+  let tipoActual = {tipo: 'TESIS', tipoId: 2};
   let ejemplaresLocal = [];
   let lockedDoc = false;
   let tsAutor = null;
   let tsCarrera = null;
-  let tsArea = null;
   let tsTutor = null;
   let tsEjEstado = null;
   let tsEjUbic = null;
@@ -284,11 +260,7 @@
 
     if(tsAutor) lockedDoc ? tsAutor.disable() : tsAutor.enable();
     if(tsCarrera) lockedDoc ? tsCarrera.disable() : tsCarrera.enable();
-    if(tsArea) lockedDoc ? tsArea.disable() : tsArea.enable();
     if(tsTutor) lockedDoc ? tsTutor.disable() : tsTutor.enable();
-
-    tipoToggle.style.pointerEvents = lockedDoc ? 'none' : '';
-    tipoToggle.style.opacity = lockedDoc ? '0.6' : '';
 
     btnReset.style.display = lockedDoc ? '' : 'none';
     if(lockedDoc) clearTituloResults();
@@ -299,13 +271,6 @@
     if(!lockedDoc){
       docIdEl.value = '';
       docHintEl.textContent = '';
-    }
-    if(tipo === 'TESIS'){
-      grupoArea.style.display = 'none';
-      grupoTutor.style.display = '';
-    } else {
-      grupoArea.style.display = '';
-      grupoTutor.style.display = 'none';
     }
   }
 
