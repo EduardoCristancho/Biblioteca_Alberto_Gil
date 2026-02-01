@@ -23,6 +23,32 @@
                 </div>
                 <h2>{{ total_documentos|default:0 }}</h2>
                 <small style="color: var(--text-light); font-size: 12px;">{{ total_items|default:0 }} copias físicas</small>
+                
+                <!-- Gráfica de dona para inventario -->
+                <div class="donut-chart inventory" style="
+                    --segment-1-end: {% widthratio titulos_disponibles_pct|default:0 100 360 %}deg;
+                    --segment-2-end: {% widthratio titulos_disponibles_pct|default:0|add:titulos_agotados_pct|default:0 100 360 %}deg;
+                ">
+                    <div class="donut-chart-ring"></div>
+                    <div class="donut-chart-center">
+                        {{ titulos_disponibles_pct|default:0 }}%
+                    </div>
+                </div>
+                
+                <div class="donut-legend">
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-green"></div>
+                        <span class="donut-legend-text">Disponibles</span>
+                    </div>
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-orange"></div>
+                        <span class="donut-legend-text">Agotados</span>
+                    </div>
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-gray"></div>
+                        <span class="donut-legend-text">Sin ejemplares</span>
+                    </div>
+                </div>
             </div>
         </a>
         <a href="{% url 'gestion_prestamos' %}?estado=activo" style="text-decoration: none; color: inherit;">
@@ -32,15 +58,67 @@
                     <i class="fa-solid fa-check green"></i>
                 </div>
                 <h2>{{ prestamos_activos|default:0 }}</h2>
+                
+                <!-- Gráfica de dona para préstamos activos -->
+                {% if prestamos_activos_pct > 0 or prestamos_vencidos_pct > 0 %}
+                <div class="donut-chart loans" style="
+                    --segment-1-end: {% widthratio prestamos_activos_pct|default:0 100 360 %}deg;
+                    --segment-2-end: 360deg;
+                ">
+                    <div class="donut-chart-ring"></div>
+                    <div class="donut-chart-center">
+                        {{ prestamos_activos_pct|default:0 }}%
+                    </div>
+                </div>
+                
+                <div class="donut-legend">
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-green"></div>
+                        <span class="donut-legend-text">Al día</span>
+                    </div>
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-red"></div>
+                        <span class="donut-legend-text">Vencidos</span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </a>
         <a href="{% url 'gestion_prestamos' %}?estado=retrasado" style="text-decoration: none; color: inherit;">
             <div class="stat-card" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'">
                 <div class="stat-card-header">
-                    <p>Libros Vencidos</p>
+                    <p>Préstamos Vencidos</p>
                     <i class="fa-solid fa-triangle-exclamation red"></i>
                 </div>
                 <h2>{{ prestamos_vencidos|default:0 }}</h2>
+                
+                <!-- Gráfica de dona para préstamos vencidos por urgencia -->
+                {% if prestamos_vencidos > 0 %}
+                <div class="donut-chart overdue" style="
+                    --segment-1-end: {% widthratio vencidos_criticos_pct|default:0 100 360 %}deg;
+                    --segment-2-end: {% widthratio vencidos_criticos_pct|default:0|add:vencidos_moderados_pct|default:0 100 360 %}deg;
+                ">
+                    <div class="donut-chart-ring"></div>
+                    <div class="donut-chart-center">
+                        {{ vencidos_criticos_pct|default:0 }}%
+                    </div>
+                </div>
+                
+                <div class="donut-legend">
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-red"></div>
+                        <span class="donut-legend-text">+30 días</span>
+                    </div>
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-orange"></div>
+                        <span class="donut-legend-text">8-30 días</span>
+                    </div>
+                    <div class="donut-legend-item">
+                        <div class="donut-legend-color legend-yellow"></div>
+                        <span class="donut-legend-text">1-7 días</span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </a>
         <a href="{% url 'gestion_usuarios' %}" style="text-decoration: none; color: inherit;">

@@ -1530,6 +1530,69 @@ def dashboard_page(request):
         except Documentos.DoesNotExist:
             continue
     
+    # Calcular porcentajes para gráficas de dona
+    # 1. Porcentaje de documentos con stock disponible vs sin stock
+    docs_con_stock = ejemplares_con_disp.values(
+        'id_documento_id'
+    ).annotate(
+        total_disponibles=Sum('disponibles')
+    ).filter(
+        total_disponibles__gt=0
+    ).count()
+    
+    docs_sin_stock_count = ejemplares_con_disp.values(
+        'id_documento_id'
+    ).annotate(
+        total_disponibles=Sum('disponibles')
+    ).filter(
+        total_disponibles=0
+    ).count()
+    
+    # Documentos que no tienen ejemplares activos
+    docs_sin_ejemplares = total_documentos - docs_con_stock - docs_sin_stock_count
+    
+    # Porcentajes para títulos únicos
+    if total_documentos > 0:
+        titulos_disponibles_pct = round((docs_con_stock / total_documentos) * 100)
+        titulos_agotados_pct = round((docs_sin_stock_count / total_documentos) * 100)
+        titulos_sin_ejemplares_pct = 100 - titulos_disponibles_pct - titulos_agotados_pct
+    else:
+        titulos_disponibles_pct = titulos_agotados_pct = titulos_sin_ejemplares_pct = 0
+    
+    # 2. Porcentaje de préstamos activos vs vencidos
+    total_prestamos_abiertos = prestamos_activos + prestamos_vencidos
+    if total_prestamos_abiertos > 0:
+        prestamos_activos_pct = round((prestamos_activos / total_prestamos_abiertos) * 100)
+        prestamos_vencidos_pct = 100 - prestamos_activos_pct
+    else:
+        prestamos_activos_pct = prestamos_vencidos_pct = 0
+    
+    # 3. Porcentaje de préstamos vencidos por urgencia (días)
+    if prestamos_vencidos > 0:
+        # Contar préstamos por rangos de días vencidos
+        vencidos_1_7 = DetallePrestamo.objects.filter(
+            fecha_devolucion_real__isnull=True,
+            fecha_vencimiento__lt=today,
+            fecha_vencimiento__gte=today - timezone.timedelta(days=7)
+        ).count()
+        
+        vencidos_8_30 = DetallePrestamo.objects.filter(
+            fecha_devolucion_real__isnull=True,
+            fecha_vencimiento__lt=today - timezone.timedelta(days=7),
+            fecha_vencimiento__gte=today - timezone.timedelta(days=30)
+        ).count()
+        
+        vencidos_mas_30 = DetallePrestamo.objects.filter(
+            fecha_devolucion_real__isnull=True,
+            fecha_vencimiento__lt=today - timezone.timedelta(days=30)
+        ).count()
+        
+        vencidos_criticos_pct = round((vencidos_mas_30 / prestamos_vencidos) * 100) if prestamos_vencidos > 0 else 0
+        vencidos_moderados_pct = round((vencidos_8_30 / prestamos_vencidos) * 100) if prestamos_vencidos > 0 else 0
+        vencidos_recientes_pct = 100 - vencidos_criticos_pct - vencidos_moderados_pct
+    else:
+        vencidos_criticos_pct = vencidos_moderados_pct = vencidos_recientes_pct = 0
+
     context = {
         'active_page': 'dashboard',
         'total_documentos': total_documentos,
@@ -1539,6 +1602,15 @@ def dashboard_page(request):
         'usuarios_registrados': usuarios_registrados,
         'prestamos_vencidos_list': prestamos_vencidos_list,
         'inventario_critico': inventario_critico,
+        # Datos para gráficas de dona
+        'titulos_disponibles_pct': titulos_disponibles_pct,
+        'titulos_agotados_pct': titulos_agotados_pct,
+        'titulos_sin_ejemplares_pct': titulos_sin_ejemplares_pct,
+        'prestamos_activos_pct': prestamos_activos_pct,
+        'prestamos_vencidos_pct': prestamos_vencidos_pct,
+        'vencidos_criticos_pct': vencidos_criticos_pct,
+        'vencidos_moderados_pct': vencidos_moderados_pct,
+        'vencidos_recientes_pct': vencidos_recientes_pct,
     }
     
     return render(request, 'dashboard.html', context)
