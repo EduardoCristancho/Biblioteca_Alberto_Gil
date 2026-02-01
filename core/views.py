@@ -1632,3 +1632,605 @@ def usuarios_gestion_page(request):
     }
     
     return render(request, 'usuarios_gestion.html', context)
+
+
+class CotaGeneratorView(generics.GenericAPIView):
+    """
+    Vista para generar cotas automáticamente basadas en sistemas bibliotecarios reales.
+    Implementa el sistema Dewey modificado y considera la ubicación física.
+    """
+    permission_classes = [AllowAny]  # Permitir acceso sin autenticación para AJAX
+    
+    def post(self, request):
+        """
+        Genera una cota automática basada en los parámetros proporcionados.
+        
+        Parámetros esperados:
+        - tipo_documento: 'LIBRO' o 'TESIS'
+        - area_conocimiento: área temática (para libros)
+        - carrera_id: ID de la carrera (para tesis)
+        - autor_apellido: apellido del autor principal
+        - titulo: título del documento
+        - año: año de publicación
+        - ubicacion_id: ID de la ubicación donde se almacenará (opcional)
+        - tomo: número de tomo (opcional, default: 1)
+        """
+        
+        tipo_doc = request.data.get('tipo_documento', '').upper()
+        area = request.data.get('area_conocimiento', '').strip()
+        carrera_id = request.data.get('carrera_id')
+        autor_apellido = request.data.get('autor_apellido', '').strip()
+        titulo = request.data.get('titulo', '').strip()
+        año = request.data.get('año')
+        ubicacion_id = request.data.get('ubicacion_id')
+        tomo = request.data.get('tomo', 1)  # Default tomo 1
+        
+        if not tipo_doc or not autor_apellido or not titulo:
+            return Response({
+                'error': 'Faltan parámetros requeridos: tipo_documento, autor_apellido, titulo'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            if tipo_doc == 'LIBRO':
+                cota = self._generar_cota_libro_realista(area, autor_apellido, titulo, año, ubicacion_id, tomo)
+            elif tipo_doc == 'TESIS':
+                cota = self._generar_cota_tesis_realista(carrera_id, autor_apellido, titulo, año, ubicacion_id, tomo)
+            else:
+                return Response({
+                    'error': 'Tipo de documento no válido'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Verificar si la cota ya existe y sugerir alternativas
+            cotas_existentes = self._verificar_cota_existente(cota)
+            
+            return Response({
+                'cota_sugerida': cota,
+                'existe': len(cotas_existentes) > 0,
+                'cotas_existentes': cotas_existentes,
+                'alternativas': self._generar_alternativas(cota) if cotas_existentes else []
+            })
+            
+        except Exception as e:
+            logger.error(f"Error generando cota: {e}")
+            return Response({
+                'error': 'Error interno generando cota'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _generar_cota_libro_realista(self, area, autor_apellido, titulo, año, ubicacion_id=None, tomo=None):
+        """
+        Genera cota para libros usando sistema Dewey modificado más realista
+        Formato: [Dewey] [Autor][letra_area][año][tomo] [Ubicacion]
+        Ejemplo: 004.678 GARp24-2 E3 (tomo 2)
+        """
+        
+        # 1. Código Dewey basado en área de conocimiento
+        codigo_dewey = self._obtener_codigo_dewey_detallado(area)
+        
+        # 2. Código del autor (primeras 3 letras del apellido)
+        codigo_autor = self._limpiar_texto_cota(autor_apellido)[:3].upper()
+        
+        # 3. Letra específica del área de conocimiento
+        letra_area = self._obtener_letra_area_conocimiento(area)
+        
+        # 4. Año (últimos 2 dígitos si está disponible)
+        codigo_año = str(año)[-2:] if año else ''
+        
+        # 5. Código de tomo (si es diferente de 1)
+        codigo_tomo = ''
+        if tomo and int(tomo) > 1:
+            codigo_tomo = f"-{tomo}"
+        
+        # 6. Código de ubicación (si está disponible)
+        codigo_ubicacion = self._obtener_codigo_ubicacion(ubicacion_id)
+        
+        # Construir la cota
+        cota_base = f"{codigo_dewey} {codigo_autor}{letra_area}{codigo_año}{codigo_tomo}"
+            
+        if codigo_ubicacion:
+            cota_base += f" {codigo_ubicacion}"
+        
+        return cota_base
+    
+    def _generar_cota_tesis_realista(self, carrera_id, autor_apellido, titulo, año, ubicacion_id=None, tomo=None):
+        """
+        Genera cota para tesis usando sistema académico realista
+        Formato: T[Carrera] [Año] [Autor] [letra_carrera][numero][tomo] [Ubicacion]
+        Ejemplo: TSIST 2024 GAR s001-2 B2 (tomo 2)
+        """
+        
+        # 1. Código de carrera
+        codigo_carrera = self._obtener_codigo_carrera_detallado(carrera_id)
+        
+        # 2. Año completo
+        codigo_año = str(año) if año else str(timezone.now().year)
+        
+        # 3. Código del autor (primeras 3 letras del apellido)
+        codigo_autor = self._limpiar_texto_cota(autor_apellido)[:3].upper()
+        
+        # 4. Letra específica de la carrera
+        letra_carrera = self._obtener_letra_carrera(carrera_id)
+        
+        # 5. Número secuencial para el año y carrera
+        numero_secuencial = self._obtener_numero_secuencial_tesis(codigo_carrera, codigo_año)
+        
+        # 6. Código de tomo (si es diferente de 1)
+        codigo_tomo = ''
+        if tomo and int(tomo) > 1:
+            codigo_tomo = f"-{tomo}"
+        
+        # 7. Código de ubicación
+        codigo_ubicacion = self._obtener_codigo_ubicacion(ubicacion_id)
+        
+        # Construir la cota
+        cota_base = f"T{codigo_carrera} {codigo_año} {codigo_autor} {letra_carrera}{numero_secuencial:03d}{codigo_tomo}"
+        
+        if codigo_ubicacion:
+            cota_base += f" {codigo_ubicacion}"
+        
+        return cota_base
+    
+    def _obtener_codigo_dewey_detallado(self, area):
+        """
+        Mapeo detallado de áreas a códigos Dewey reales
+        """
+        dewey_detallado = {
+            # Ciencias de la Computación
+            'programacion': '005.1',
+            'algoritmos': '005.1',
+            'base de datos': '005.74',
+            'bases de datos': '005.74',
+            'redes': '004.6',
+            'redes de computadores': '004.6',
+            'sistemas operativos': '005.43',
+            'ingenieria de software': '005.1',
+            'inteligencia artificial': '006.3',
+            'machine learning': '006.31',
+            'web': '006.7',
+            'desarrollo web': '006.7',
+            'seguridad informatica': '005.8',
+            'ciberseguridad': '005.8',
+            
+            # Matemáticas
+            'matematicas': '510',
+            'algebra': '512',
+            'calculo': '515',
+            'estadistica': '519.5',
+            'probabilidad': '519.2',
+            'geometria': '516',
+            
+            # Física
+            'fisica': '530',
+            'mecanica': '531',
+            'termodinamica': '536',
+            'electricidad': '537',
+            'electronica': '537.5',
+            
+            # Química
+            'quimica': '540',
+            'quimica organica': '547',
+            'quimica inorganica': '546',
+            
+            # Ingeniería
+            'ingenieria civil': '624',
+            'ingenieria mecanica': '621',
+            'ingenieria electrica': '621.3',
+            'ingenieria electronica': '621.381',
+            'ingenieria industrial': '658.5',
+            'ingenieria de sistemas': '004',
+            
+            # Administración y Negocios
+            'administracion': '658',
+            'marketing': '658.8',
+            'finanzas': '658.15',
+            'recursos humanos': '658.3',
+            'contabilidad': '657',
+            'economia': '330',
+            
+            # Medicina y Salud
+            'medicina': '610',
+            'enfermeria': '610.73',
+            'farmacia': '615',
+            'odontologia': '617.6',
+            'psicologia': '150',
+            
+            # Ciencias Sociales
+            'derecho': '340',
+            'sociologia': '301',
+            'antropologia': '301',
+            'trabajo social': '361',
+            'educacion': '370',
+            'pedagogia': '371',
+            
+            # Metodología e Investigación
+            'metodologia de la investigacion': '001.42',
+            'metodologia': '001.42',
+            'investigacion': '001.4',
+            'metodos de investigacion': '001.42',
+            'investigacion cientifica': '001.4',
+            'investigacion cualitativa': '001.42',
+            'investigacion cuantitativa': '001.42',
+            'epistemologia': '121',
+            'teoria del conocimiento': '121',
+            
+            # Artes y Literatura
+            'literatura': '800',
+            'arte': '700',
+            'musica': '780',
+            'teatro': '792',
+            'cine': '791.43',
+            
+            # Historia y Geografía
+            'historia': '900',
+            'geografia': '910',
+            'arqueologia': '930',
+            
+            # Filosofía y Religión
+            'filosofia': '100',
+            'etica': '170',
+            'religion': '200',
+        }
+        
+        area_norm = _normalize_text(area)
+        
+        # Buscar coincidencia exacta primero
+        for key, codigo in dewey_detallado.items():
+            if key in area_norm:
+                return codigo
+        
+        # Buscar por palabras clave
+        palabras_area = area_norm.split()
+        for palabra in palabras_area:
+            for key, codigo in dewey_detallado.items():
+                if palabra in key or key in palabra:
+                    return codigo
+        
+        # Default genérico
+        return '000'
+    
+    def _obtener_codigo_carrera_detallado(self, carrera_id):
+        """
+        Obtiene código detallado de carrera basado en el nombre real
+        """
+        if not carrera_id:
+            return 'GEN'
+        
+        try:
+            carrera = Carreras.objects.get(id_carrera=carrera_id)
+            nombre = carrera.nombre_carrera.upper()
+            
+            # Mapeo específico de carreras
+            if 'SISTEMAS' in nombre or 'INFORMATICA' in nombre or 'COMPUTACION' in nombre:
+                return 'SIST'
+            elif 'INDUSTRIAL' in nombre:
+                return 'IND'
+            elif 'CIVIL' in nombre:
+                return 'CIV'
+            elif 'ELECTRONICA' in nombre or 'ELECTRICA' in nombre:
+                return 'ELEC'
+            elif 'MECANICA' in nombre:
+                return 'MEC'
+            elif 'ADMINISTRACION' in nombre or 'EMPRESAS' in nombre:
+                return 'ADM'
+            elif 'CONTADURIA' in nombre or 'CONTABLE' in nombre:
+                return 'CONT'
+            elif 'DERECHO' in nombre:
+                return 'DER'
+            elif 'MEDICINA' in nombre:
+                return 'MED'
+            elif 'ENFERMERIA' in nombre:
+                return 'ENF'
+            elif 'PSICOLOGIA' in nombre:
+                return 'PSI'
+            elif 'EDUCACION' in nombre or 'PEDAGOGIA' in nombre:
+                return 'EDU'
+            else:
+                # Generar código basado en las primeras letras
+                palabras = [p for p in nombre.split() if len(p) > 2]
+                if len(palabras) >= 2:
+                    return palabras[0][:2] + palabras[1][:2]
+                elif len(palabras) == 1:
+                    return palabras[0][:4]
+                else:
+                    return 'GEN'
+                    
+        except Carreras.DoesNotExist:
+            return 'GEN'
+    
+    def _obtener_letra_area_conocimiento(self, area):
+        """
+        Obtiene una letra específica basada en el área de conocimiento
+        """
+        if not area:
+            return 'g'  # General
+        
+        area_norm = _normalize_text(area)
+        
+        # Mapeo específico de áreas a letras identificativas
+        letras_area = {
+            # Ciencias de la Computación
+            'programacion': 'p',
+            'algoritmos': 'a',
+            'base de datos': 'bd',
+            'redes': 'r',
+            'redes de computadores': 'rdc',
+            'sistemas operativos': 'so',
+            'ingenieria de software': 'ids',
+            'inteligencia artificial': 'ia',
+            'machine learning': 'ml',
+            'web': 'w',
+            'desarrollo web': 'dw',
+            'seguridad informatica': 'sei',
+            'ciberseguridad': 'cib',
+            
+            # Matemáticas
+            'matematicas': 'm',
+            'algebra': 'a',
+            'calculo': 'c',
+            'estadistica': 'e',
+            'probabilidad': 'p',
+            'geometria': 'g',
+            
+            # Física y Química
+            'fisica': 'f',
+            'quimica': 'q',
+            'mecanica': 'mec',
+            'termodinamica': 't',
+            'electricidad': 'e',
+            'electronica': 'l',
+            
+            # Ingeniería
+            'ingenieria civil': 'ic',
+            'ingenieria mecanica': 'im',
+            'ingenieria electrica': 'ie',
+            'ingenieria electronica': 'iel',
+            'ingenieria industrial': 'iin',
+            'ingenieria de sistemas': 'is',
+            
+            # Administración y Negocios
+            'administracion': 'a',
+            'marketing': 'k',
+            'finanzas': 'f',
+            'recursos humanos': 'h',
+            'contabilidad': 'c',
+            'economia': 'e',
+            
+            # Medicina y Salud
+            'medicina': 'm',
+            'enfermeria': 'n',
+            'farmacia': 'f',
+            'odontologia': 'o',
+            'psicologia': 'p',
+            
+            # Ciencias Sociales
+            'derecho': 'd',
+            'sociologia': 's',
+            'antropologia': 'a',
+            'trabajo social': 't',
+            'educacion': 'e',
+            'pedagogia': 'p',
+            
+            # Metodología e Investigación
+            'metodologia de la investigacion': 'mdli',
+            'metodologia': 'met',
+            'investigacion': 'inv',
+            'metodos de investigacion': 'mdi',
+            'investigacion cientifica': 'icie',
+            'investigacion cualitativa': 'icual',
+            'investigacion cuantitativa': 'icuan',
+            'epistemologia': 'epi',
+            'teoria del conocimiento': 'tdc',
+            
+            # Artes y Literatura
+            'literatura': 'l',
+            'arte': 'a',
+            'musica': 'm',
+            'teatro': 't',
+            'cine': 'c',
+            
+            # Historia y Geografía
+            'historia': 'h',
+            'geografia': 'g',
+            'arqueologia': 'a',
+            
+            # Filosofía y Religión
+            'filosofia': 'f',
+            'etica': 'e',
+            'religion': 'r',
+        }
+        
+        # Buscar coincidencia exacta primero
+        for key, letra in letras_area.items():
+            if key in area_norm:
+                return letra
+        
+        # Buscar por palabras clave
+        palabras_area = area_norm.split()
+        for palabra in palabras_area:
+            for key, letra in letras_area.items():
+                if palabra in key or key in palabra:
+                    return letra
+        
+        # Si no encuentra, usar la primera letra del área
+        area_limpia = self._limpiar_texto_cota(area)
+        return area_limpia[0].lower() if area_limpia else 'g'
+    
+    def _obtener_letra_carrera(self, carrera_id):
+        """
+        Obtiene una letra específica basada en la carrera
+        """
+        if not carrera_id:
+            return 'g'  # General
+        
+        try:
+            carrera = Carreras.objects.get(id_carrera=carrera_id)
+            nombre = carrera.nombre_carrera.upper()
+            
+            # Mapeo específico de carreras a letras identificativas
+            if 'SISTEMAS' in nombre or 'INFORMATICA' in nombre or 'COMPUTACION' in nombre:
+                return 's'
+            elif 'INDUSTRIAL' in nombre:
+                return 'i'
+            elif 'CIVIL' in nombre:
+                return 'c'
+            elif 'ELECTRONICA' in nombre:
+                return 'l'
+            elif 'ELECTRICA' in nombre:
+                return 'e'
+            elif 'MECANICA' in nombre:
+                return 'm'
+            elif 'ADMINISTRACION' in nombre or 'EMPRESAS' in nombre:
+                return 'a'
+            elif 'CONTADURIA' in nombre or 'CONTABLE' in nombre:
+                return 't'
+            elif 'DERECHO' in nombre:
+                return 'd'
+            elif 'MEDICINA' in nombre:
+                return 'm'
+            elif 'ENFERMERIA' in nombre:
+                return 'n'
+            elif 'PSICOLOGIA' in nombre:
+                return 'p'
+            elif 'EDUCACION' in nombre or 'PEDAGOGIA' in nombre:
+                return 'e'
+            else:
+                # Usar la primera letra de la primera palabra significativa
+                palabras = [p for p in nombre.split() if len(p) > 2]
+                return palabras[0][0].lower() if palabras else 'g'
+                
+        except Carreras.DoesNotExist:
+            return 'g'
+    
+    def _obtener_codigo_ubicacion(self, ubicacion_id):
+        """
+        Obtiene código de ubicación basado en la descripción real
+        """
+        if not ubicacion_id:
+            return None
+        
+        try:
+            ubicacion = Ubicaciones.objects.get(id_ubicacion=ubicacion_id)
+            descripcion = ubicacion.descripcion_completa.upper()
+            
+            # Extraer códigos comunes de ubicación
+            if 'ESTANTE' in descripcion or 'SHELF' in descripcion:
+                # Buscar números en la descripción
+                import re
+                numeros = re.findall(r'\d+', descripcion)
+                if numeros:
+                    return f"E{numeros[0]}"
+            
+            if 'PISO' in descripcion or 'FLOOR' in descripcion:
+                import re
+                numeros = re.findall(r'\d+', descripcion)
+                if numeros:
+                    return f"P{numeros[0]}"
+            
+            if 'SECCION' in descripcion or 'SECTION' in descripcion:
+                # Buscar letras después de sección
+                import re
+                letras = re.findall(r'[A-Z]', descripcion)
+                if letras:
+                    return f"S{letras[0]}"
+            
+            # Generar código basado en las primeras letras
+            palabras = [p for p in descripcion.split() if len(p) > 1]
+            if palabras:
+                return palabras[0][:2]
+            
+            return f"U{ubicacion_id}"
+            
+        except Ubicaciones.DoesNotExist:
+            return None
+    
+    def _obtener_numero_secuencial_tesis(self, codigo_carrera, año):
+        """
+        Obtiene el siguiente número secuencial para tesis de una carrera en un año específico
+        """
+        try:
+            # Buscar tesis existentes con el mismo patrón
+            patron = f"T{codigo_carrera} {año}"
+            cotas_existentes = Ejemplares.objects.filter(
+                codigo_cota__startswith=patron
+            ).values_list('codigo_cota', flat=True)
+            
+            numeros = []
+            for cota in cotas_existentes:
+                try:
+                    # Extraer el número secuencial de la cota
+                    # Formato esperado: TSIST 2024 GAR s001
+                    partes = cota.split()
+                    if len(partes) >= 4:
+                        numero_parte = partes[3]
+                        # Extraer solo los dígitos del final
+                        import re
+                        match = re.search(r'(\d+)', numero_parte)
+                        if match:
+                            numeros.append(int(match.group(1)))
+                except:
+                    continue
+            
+            return max(numeros) + 1 if numeros else 1
+            
+        except Exception:
+            return 1
+    
+    def _limpiar_texto_cota(self, texto):
+        """Limpia texto para usar en cotas (sin acentos, espacios, caracteres especiales)"""
+        if not texto:
+            return ''
+        
+        # Normalizar y quitar acentos
+        texto_limpio = _normalize_text(texto)
+        
+        # Quitar espacios y caracteres especiales, mantener solo letras y números
+        import re
+        texto_limpio = re.sub(r'[^a-z0-9]', '', texto_limpio)
+        
+        return texto_limpio
+    
+    def _verificar_cota_existente(self, cota):
+        """Verifica si una cota ya existe y retorna las cotas similares"""
+        
+        cotas_existentes = list(
+            Ejemplares.objects.filter(
+                codigo_cota__iexact=cota
+            ).values_list('codigo_cota', flat=True)
+        )
+        
+        return cotas_existentes
+    
+    def _generar_alternativas(self, cota_base):
+        """Genera cotas alternativas cuando la original ya existe"""
+        
+        alternativas = []
+        
+        # Para cotas con espacios (formato Dewey), agregar sufijos antes del último espacio
+        if ' ' in cota_base:
+            partes = cota_base.rsplit(' ', 1)
+            base = partes[0]
+            final = partes[1] if len(partes) > 1 else ''
+            
+            # Agregar sufijos alfabéticos
+            for letra in ['a', 'b', 'c', 'd', 'e']:
+                alt = f"{base} {final}{letra}" if final else f"{base}{letra}"
+                if not self._verificar_cota_existente(alt):
+                    alternativas.append(alt)
+            
+            # Agregar sufijos numéricos
+            for i in range(1, 4):
+                alt = f"{base} {final}-{i}" if final else f"{base}-{i}"
+                if not self._verificar_cota_existente(alt):
+                    alternativas.append(alt)
+        else:
+            # Para cotas sin espacios, agregar sufijos al final
+            for letra in ['a', 'b', 'c', 'd', 'e']:
+                alt = f"{cota_base}{letra}"
+                if not self._verificar_cota_existente(alt):
+                    alternativas.append(alt)
+            
+            for i in range(1, 4):
+                alt = f"{cota_base}-{i}"
+                if not self._verificar_cota_existente(alt):
+                    alternativas.append(alt)
+        
+        return alternativas[:3]  # Retornar máximo 3 alternativas

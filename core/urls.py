@@ -10,7 +10,7 @@ from .views import (
     EjemplarCreateView,
     PrestamoListCreateView, PrestamoDetailView, PrestamoConcluirView,
     AreaSugerenciaView, TutorSugerenciaView, AreaCatalogoView,
-    UsuarioSugerenciaView,
+    UsuarioSugerenciaView, CotaGeneratorView,
 )
 
 router = DefaultRouter()
@@ -47,6 +47,9 @@ urlpatterns = [
     path('sugerencias/tutores', TutorSugerenciaView.as_view()),
     path('sugerencias/usuarios', UsuarioSugerenciaView.as_view()),
     path('areas/', AreaCatalogoView.as_view()),
+    
+    # Generador de cotas
+    path('generar-cota/', CotaGeneratorView.as_view()),
 
     # Prestamos
     path('prestamo', PrestamoListCreateView.as_view()),  # GET list + POST create

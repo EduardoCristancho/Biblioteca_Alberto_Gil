@@ -89,7 +89,17 @@
             </div>
             <div class="form-group">
                 <label for="ej-cota">Cota *</label>
-                <input type="text" id="ej-cota" placeholder="ej. 863.3 C418q">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="ej-cota" placeholder="ej. 863.3 C418q" style="flex: 1;">
+                    <button type="button" id="btn-generar-cota" class="btn-secondary" title="Generar cota automáticamente">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </button>
+                </div>
+                <div style="margin-top: 6px;">
+                    <small id="cota-hint" style="color: var(--text-light);">
+                        Completa título y autor para generar automáticamente
+                    </small>
+                </div>
             </div>
         </div>
 
@@ -161,11 +171,13 @@
   const ejUbicEl = document.getElementById('ej-ubicacion');
   const ejHintEl = document.getElementById('ej-hint');
   const ejTbody = document.getElementById('ej-tbody');
+  const cotaHintEl = document.getElementById('cota-hint');
 
   const btnAddEj = document.getElementById('btn-add-ej');
   const btnCancel = document.getElementById('btn-cancel');
   const btnSubmit = document.getElementById('btn-submit');
   const btnReset = document.getElementById('btn-reset');
+  const btnGenerarCota = document.getElementById('btn-generar-cota');
 
   let catalogsPromise = null;
   let catalogsCache = null;
@@ -389,6 +401,222 @@
     });
   }
 
+  async function generarCotaAutomatica() {
+    try {
+      const titulo = (tituloEl.value || '').trim();
+      const fecha = (fechaEl.value || '').trim();
+      const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+      const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+      const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
+      const tomo = ejTomoEl.value || 1;
+      
+      if (!titulo || !autorId) {
+        cotaHintEl.textContent = 'Completa título y autor para generar cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+        return false;
+      }
+      
+      // Obtener apellido del autor
+      let autorApellido = '';
+      if (tsAutor && tsAutor.options[autorId]) {
+        const autorText = tsAutor.options[autorId].text;
+        const partes = autorText.split(' ');
+        autorApellido = partes[partes.length - 1]; // último elemento es el apellido
+      }
+      
+      if (!autorApellido) {
+        cotaHintEl.textContent = 'No se pudo obtener el apellido del autor';
+        cotaHintEl.style.color = 'var(--warning-color)';
+        return false;
+      }
+      
+      const payload = {
+        tipo_documento: tipoActual.tipo,
+        titulo: titulo,
+        autor_apellido: autorApellido,
+        año: fecha ? new Date(fecha).getFullYear() : null,
+        tomo: parseInt(tomo)
+      };
+      
+      if (tipoActual.tipo === 'LIBRO' && area) {
+        payload.area_conocimiento = area;
+      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+        payload.carrera_id = parseInt(carreraId);
+      }
+      
+      // Incluir ubicación si está seleccionada
+      if (ubicacionId) {
+        payload.ubicacion_id = parseInt(ubicacionId);
+      }
+      
+      const resp = await csrfFetch('/api/generar-cota/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      
+      if (!resp.ok) {
+        const error = await resp.text().catch(() => 'Error generando cota');
+        cotaHintEl.textContent = 'Error generando cota: ' + error.substring(0, 50);
+        cotaHintEl.style.color = 'var(--error-color)';
+        return false;
+      }
+      
+      const result = await resp.json();
+      ejCotaEl.value = result.cota_sugerida || '';
+      
+      if (result.existe && result.alternativas?.length > 0) {
+        cotaHintEl.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i> Cota ya existe, usando alternativa: ${result.alternativas[0]}`;
+        cotaHintEl.style.color = 'var(--warning-color)';
+        ejCotaEl.value = result.alternativas[0];
+      } else {
+        const tomoText = parseInt(tomo) > 1 ? ` (Tomo ${tomo})` : '';
+        cotaHintEl.innerHTML = `<i class="fa-solid fa-check"></i> Cota generada automáticamente${tomoText}`;
+        cotaHintEl.style.color = 'var(--success-color)';
+      }
+      
+      return true;
+      
+    } catch (e) {
+      console.error('Error:', e);
+      cotaHintEl.textContent = 'Error generando cota';
+      cotaHintEl.style.color = 'var(--error-color)';
+      return false;
+    }
+  }
+
+  // Generar cota automáticamente cuando se completen los campos necesarios
+  function verificarYGenerarCota() {
+    const titulo = (tituloEl.value || '').trim();
+    const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+    const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+    const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+    
+    // Solo generar si no hay cota ya y se tienen los datos mínimos
+    if (!ejCotaEl.value.trim() && titulo && autorId) {
+      if (tipoActual.tipo === 'LIBRO' && area) {
+        generarCotaAutomatica();
+      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+        generarCotaAutomatica();
+      } else if (tipoActual.tipo === 'LIBRO' && !area) {
+        cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+      } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
+        cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+      }
+    }
+  }
+
+  async function generarCotaAutomatica() {
+    try {
+      const titulo = (tituloEl.value || '').trim();
+      const fecha = (fechaEl.value || '').trim();
+      const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+      const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+      const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
+      const tomo = ejTomoEl.value || 1;
+      
+      if (!titulo || !autorId) {
+        cotaHintEl.textContent = 'Completa título y autor para generar cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+        return false;
+      }
+      
+      // Obtener apellido del autor
+      let autorApellido = '';
+      if (tsAutor && tsAutor.options[autorId]) {
+        const autorText = tsAutor.options[autorId].text;
+        const partes = autorText.split(' ');
+        autorApellido = partes[partes.length - 1]; // último elemento es el apellido
+      }
+      
+      if (!autorApellido) {
+        cotaHintEl.textContent = 'No se pudo obtener el apellido del autor';
+        cotaHintEl.style.color = 'var(--warning-color)';
+        return false;
+      }
+      
+      const payload = {
+        tipo_documento: tipoActual.tipo,
+        titulo: titulo,
+        autor_apellido: autorApellido,
+        año: fecha ? new Date(fecha).getFullYear() : null,
+        tomo: parseInt(tomo)
+      };
+      
+      if (tipoActual.tipo === 'LIBRO' && area) {
+        payload.area_conocimiento = area;
+      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+        payload.carrera_id = parseInt(carreraId);
+      }
+      
+      // Incluir ubicación si está seleccionada
+      if (ubicacionId) {
+        payload.ubicacion_id = parseInt(ubicacionId);
+      }
+      
+      const resp = await csrfFetch('/api/generar-cota/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      
+      if (!resp.ok) {
+        const error = await resp.text().catch(() => 'Error generando cota');
+        cotaHintEl.textContent = 'Error generando cota: ' + error.substring(0, 50);
+        cotaHintEl.style.color = 'var(--error-color)';
+        return false;
+      }
+      
+      const result = await resp.json();
+      ejCotaEl.value = result.cota_sugerida || '';
+      
+      if (result.existe && result.alternativas?.length > 0) {
+        cotaHintEl.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i> Cota ya existe, usando alternativa: ${result.alternativas[0]}`;
+        cotaHintEl.style.color = 'var(--warning-color)';
+        ejCotaEl.value = result.alternativas[0];
+      } else {
+        const tomoText = parseInt(tomo) > 1 ? ` (Tomo ${tomo})` : '';
+        cotaHintEl.innerHTML = `<i class="fa-solid fa-check"></i> Cota generada automáticamente${tomoText}`;
+        cotaHintEl.style.color = 'var(--success-color)';
+      }
+      
+      return true;
+      
+    } catch (e) {
+      console.error('Error:', e);
+      cotaHintEl.textContent = 'Error generando cota';
+      cotaHintEl.style.color = 'var(--error-color)';
+      return false;
+    }
+  }
+
+  // Generar cota automáticamente cuando se completen los campos necesarios
+  function verificarYGenerarCota() {
+    const titulo = (tituloEl.value || '').trim();
+    const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+    const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+    const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+    
+    // Solo generar si no hay cota ya y se tienen los datos mínimos
+    if (!ejCotaEl.value.trim() && titulo && autorId) {
+      if (tipoActual.tipo === 'LIBRO' && area) {
+        generarCotaAutomatica();
+      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+        generarCotaAutomatica();
+      } else if (tipoActual.tipo === 'LIBRO' && !area) {
+        cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+      } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
+        cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
+        cotaHintEl.style.color = 'var(--warning-color)';
+      }
+    }
+  }
+
   async function initSelects(){
     ensureCss(TOMSELECT_CSS);
     const ok = await ensureScript(TOMSELECT_JS);
@@ -400,9 +628,26 @@
     ejUbicEl.innerHTML = '<option value="">Seleccione ubicación</option>' + ubicaciones.map(u => `<option value="${u.id_ubicacion}">${u.descripcion_completa || ('Ubicación #' + u.id_ubicacion)}</option>`).join('');
 
     if(ok && window.TomSelect){
-      tsCarrera = new TomSelect(carreraEl, {create:false, allowEmptyOption:true, placeholder:'Buscar carrera...'});
+      tsCarrera = new TomSelect(carreraEl, {
+        create:false, 
+        allowEmptyOption:true, 
+        placeholder:'Buscar carrera...', 
+        onChange: () => {
+          setTimeout(verificarYGenerarCota, 100);
+        }
+      });
       tsEjEstado = new TomSelect(ejEstadoEl, {create:false, allowEmptyOption:true, placeholder:'Buscar estado...'});
-      tsEjUbic = new TomSelect(ejUbicEl, {create:false, allowEmptyOption:true, placeholder:'Buscar ubicación...'});
+      tsEjUbic = new TomSelect(ejUbicEl, {
+        create:false, 
+        allowEmptyOption:true, 
+        placeholder:'Buscar ubicación...',
+        onChange: () => {
+          // Regenerar cota si ya hay una y se cambia la ubicación
+          if (ejCotaEl.value.trim()) {
+            setTimeout(generarCotaAutomatica, 100);
+          }
+        }
+      });
 
       const autorCache = new Map();
       tsAutor = new TomSelect(autorEl, {
@@ -423,6 +668,7 @@
               }
               const a = await resp.json();
               callback({value: String(a.id_autor), text: `${a.nombre} ${a.apellido}`.trim()});
+              setTimeout(verificarYGenerarCota, 100);
             }catch(e){
               callback();
             }
@@ -431,6 +677,9 @@
         valueField:'value',
         labelField:'text',
         searchField:['text'],
+        onChange: () => {
+          setTimeout(verificarYGenerarCota, 100);
+        },
         load: async (query, callback) => {
           const q = (query||'').trim();
           if(q.length < 2) return callback();
@@ -451,7 +700,10 @@
       tsArea = new TomSelect(areaEl, {
         create:false,
         allowEmptyOption:true,
-        placeholder:'Buscar área...'
+        placeholder:'Buscar área...',
+        onChange: () => {
+          setTimeout(verificarYGenerarCota, 100);
+        }
       });
 
       const tutorCache = new Map();
@@ -509,6 +761,11 @@
       try{
         const items = await buscarTitulos(term);
         renderTituloResults(items);
+        
+        // Verificar si se puede generar cota después de escribir título
+        if (term.length >= 3) {
+          setTimeout(verificarYGenerarCota, 500);
+        }
       }catch(e){
         clearTituloResults();
       }
@@ -517,6 +774,44 @@
 
   document.addEventListener('click', (e)=>{
     if(!tituloResultsEl.contains(e.target) && e.target !== tituloEl) clearTituloResults();
+  });
+
+  // Regenerar cota cuando cambie el tomo
+  ejTomoEl.addEventListener('change', () => {
+    if (ejCotaEl.value.trim()) {
+      setTimeout(generarCotaAutomatica, 100);
+    }
+  });
+
+  // Botón manual para generar cota
+  btnGenerarCota.addEventListener('click', async () => {
+    btnGenerarCota.disabled = true;
+    const originalHtml = btnGenerarCota.innerHTML;
+    btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    
+    await generarCotaAutomatica();
+    
+    btnGenerarCota.disabled = false;
+    btnGenerarCota.innerHTML = originalHtml;
+  });
+
+  // Regenerar cota cuando cambie el tomo
+  ejTomoEl.addEventListener('change', () => {
+    if (ejCotaEl.value.trim()) {
+      setTimeout(generarCotaAutomatica, 100);
+    }
+  });
+
+  // Botón manual para generar cota
+  btnGenerarCota.addEventListener('click', async () => {
+    btnGenerarCota.disabled = true;
+    const originalHtml = btnGenerarCota.innerHTML;
+    btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    
+    await generarCotaAutomatica();
+    
+    btnGenerarCota.disabled = false;
+    btnGenerarCota.innerHTML = originalHtml;
   });
 
   btnAddEj.addEventListener('click', async ()=>{
