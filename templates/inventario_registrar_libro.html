@@ -3,348 +3,351 @@
 {% block title %}Registrar Nuevo Libro{% endblock %}
 
 {% block content %}
-    <div class="form-header">
-        <a href="{% url 'gestion_inventario' %}">
-            <i class="fa-solid fa-arrow-left"></i>
-            Registrar Nuevo Libro
-        </a>
-        <p>Ingrese la información completa del libro para el catálogo</p>
+<div class="form-header">
+  <a href="{% url 'gestion_inventario' %}">
+    <i class="fa-solid fa-arrow-left"></i>
+    Registrar Nuevo Libro
+  </a>
+  <p>Ingrese la información completa del libro para el catálogo</p>
+</div>
+
+<form class="form-card" id="inv-reg-form" style="max-width: 900px; margin: 0 auto;">
+  <input type="hidden" id="doc-id" value="">
+  <input type="hidden" id="tipo-documento" value="LIBRO">
+  <input type="hidden" id="tipo-documento-id" value="1">
+
+  <div class="form-section-title">
+    <i class="fa-solid fa-book-bookmark" style="color: var(--primary-color);"></i>
+    Información del Libro
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="titulo">Título *</label>
+      <div class="lookup-box">
+        <input type="text" id="titulo" autocomplete="off">
+        <div class="lookup-results" id="titulo-results" style="display:none;"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+          <small id="doc-hint" style="color: var(--text-light);"></small>
+          <button type="button" class="btn-secondary" id="btn-reset" style="margin-left:auto; display:none;">Nueva
+            búsqueda</button>
+        </div>
+      </div>
     </div>
 
-    <form class="form-card" id="inv-reg-form" style="max-width: 900px; margin: 0 auto;">
-        <input type="hidden" id="doc-id" value="">
-        <input type="hidden" id="tipo-documento" value="LIBRO">
-        <input type="hidden" id="tipo-documento-id" value="1">
+    <div class="form-group">
+      <label for="autor">Autor *</label>
+      <select id="autor" placeholder="Buscar autor..."></select>
+    </div>
+  </div>
 
-        <div class="form-section-title">
-            <i class="fa-solid fa-book-bookmark" style="color: var(--primary-color);"></i>
-            Información del Libro
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="titulo">Título *</label>
-                <div class="lookup-box">
-                    <input type="text" id="titulo" autocomplete="off">
-                    <div class="lookup-results" id="titulo-results" style="display:none;"></div>
-                    <div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
-                        <small id="doc-hint" style="color: var(--text-light);"></small>
-                        <button type="button" class="btn-secondary" id="btn-reset" style="margin-left:auto; display:none;">Nueva búsqueda</button>
-                    </div>
-                </div>
-            </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="carrera">Carrera</label>
+      <select id="carrera" placeholder="Buscar carrera..."></select>
+    </div>
+    <div class="form-group">
+      <label for="fecha">Fecha de Publicación/Defensa *</label>
+      <input type="date" id="fecha">
+    </div>
+  </div>
 
-            <div class="form-group">
-                <label for="autor">Autor *</label>
-                <select id="autor" placeholder="Buscar autor..."></select>
-            </div>
-        </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="area">Área de Conocimiento *</label>
+      <select id="area" placeholder="Buscar área..."></select>
+    </div>
+  </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label for="carrera">Carrera</label>
-                <select id="carrera" placeholder="Buscar carrera..."></select>
-            </div>
-            <div class="form-group">
-                <label for="fecha">Fecha de Publicación/Defensa *</label>
-                <input type="date" id="fecha">
-            </div>
-        </div>
+  <div class="form-section-title">
+    <i class="fa-solid fa-boxes-stacked"></i>
+    Agregar Ejemplares
+  </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label for="area">Área de Conocimiento *</label>
-                <select id="area" placeholder="Buscar área..."></select>
-            </div>
-        </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="ej-tomo">Tomo</label>
+      <input type="number" id="ej-tomo" min="1" max="100" placeholder="Ej. 1" value="1">
+    </div>
+    <div class="form-group">
+      <label for="ej-cota">Cota *</label>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="text" id="ej-cota" placeholder="ej. 863.3 C418q" style="flex: 1;">
+        <button type="button" id="btn-generar-cota" class="btn-secondary" title="Generar cota automáticamente">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </button>
+      </div>
+      <div style="margin-top: 6px;">
+        <small id="cota-hint" style="color: var(--text-light);">
+          Completa título y autor para generar automáticamente
+        </small>
+      </div>
+    </div>
+  </div>
 
-        <div class="form-section-title">
-            <i class="fa-solid fa-boxes-stacked"></i>
-            Agregar Ejemplares
-        </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="ej-estado">Estado *</label>
+      <select id="ej-estado" placeholder="Buscar estado..."></select>
+    </div>
+    <div class="form-group">
+      <label for="ej-ubicacion">Ubicación *</label>
+      <select id="ej-ubicacion" placeholder="Buscar ubicación..."></select>
+    </div>
+  </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label for="ej-tomo">Tomo</label>
-                <input type="number" id="ej-tomo" min="1" max="100" placeholder="Ej. 1" value="1">
-            </div>
-            <div class="form-group">
-                <label for="ej-cota">Cota *</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" id="ej-cota" placeholder="ej. 863.3 C418q" style="flex: 1;">
-                    <button type="button" id="btn-generar-cota" class="btn-secondary" title="Generar cota automáticamente">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    </button>
-                </div>
-                <div style="margin-top: 6px;">
-                    <small id="cota-hint" style="color: var(--text-light);">
-                        Completa título y autor para generar automáticamente
-                    </small>
-                </div>
-            </div>
-        </div>
+  <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
+    <button type="button" class="btn-secondary" id="btn-add-ej">Añadir ejemplar</button>
+    <small style="color: var(--text-light);" id="ej-hint"></small>
+  </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label for="ej-estado">Estado *</label>
-                <select id="ej-estado" placeholder="Buscar estado..."></select>
-            </div>
-            <div class="form-group">
-                <label for="ej-ubicacion">Ubicación *</label>
-                <select id="ej-ubicacion" placeholder="Buscar ubicación..."></select>
-            </div>
-        </div>
+  <div class="ej-table-wrap">
+    <table class="ej-table" id="ej-table">
+      <thead>
+        <tr>
+          <th>Tomo</th>
+          <th>Cota</th>
+          <th>Estado</th>
+          <th>Ubicación</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="ej-tbody">
+        <tr>
+          <td colspan="5" style="color: var(--text-light);">No has agregado ejemplares.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
-            <button type="button" class="btn-secondary" id="btn-add-ej">Añadir ejemplar</button>
-            <small style="color: var(--text-light);" id="ej-hint"></small>
-        </div>
-
-        <div class="ej-table-wrap">
-            <table class="ej-table" id="ej-table">
-                <thead>
-                    <tr>
-                        <th>Tomo</th>
-                        <th>Cota</th>
-                        <th>Estado</th>
-                        <th>Ubicación</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="ej-tbody">
-                    <tr><td colspan="5" style="color: var(--text-light);">No has agregado ejemplares.</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="form-actions">
-            <button type="button" class="btn-secondary" id="btn-cancel">X Cancelar</button>
-            <button type="submit" class="btn-confirm" id="btn-submit">Guardar</button>
-        </div>
-    </form>
+  <div class="form-actions">
+    <button type="button" class="btn-secondary" id="btn-cancel">X Cancelar</button>
+    <button type="submit" class="btn-confirm" id="btn-submit">Guardar</button>
+  </div>
+</form>
 
 <script>
-(function(){
-  const TOMSELECT_CSS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css';
-  const TOMSELECT_JS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js';
-  const LS_KEY_REG_CATALOGS = 'inv_reg_catalogs_v1';
+  (function () {
+    const TOMSELECT_CSS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css';
+    const TOMSELECT_JS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js';
+    const LS_KEY_REG_CATALOGS = 'inv_reg_catalogs_v1';
 
-  const form = document.getElementById('inv-reg-form');
-  const tipoToggle = document.getElementById('tipo-toggle');
-  const docIdEl = document.getElementById('doc-id');
+    const form = document.getElementById('inv-reg-form');
+    const tipoToggle = document.getElementById('tipo-toggle');
+    const docIdEl = document.getElementById('doc-id');
 
-  const tituloEl = document.getElementById('titulo');
-  const tituloResultsEl = document.getElementById('titulo-results');
-  const docHintEl = document.getElementById('doc-hint');
+    const tituloEl = document.getElementById('titulo');
+    const tituloResultsEl = document.getElementById('titulo-results');
+    const docHintEl = document.getElementById('doc-hint');
 
-  const carreraEl = document.getElementById('carrera');
-  const autorEl = document.getElementById('autor');
-  const areaEl = document.getElementById('area');
+    const carreraEl = document.getElementById('carrera');
+    const autorEl = document.getElementById('autor');
+    const areaEl = document.getElementById('area');
 
-  const fechaEl = document.getElementById('fecha');
+    const fechaEl = document.getElementById('fecha');
 
-  const ejTomoEl = document.getElementById('ej-tomo');
-  const ejCotaEl = document.getElementById('ej-cota');
-  const ejEstadoEl = document.getElementById('ej-estado');
-  const ejUbicEl = document.getElementById('ej-ubicacion');
-  const ejHintEl = document.getElementById('ej-hint');
-  const ejTbody = document.getElementById('ej-tbody');
-  const cotaHintEl = document.getElementById('cota-hint');
+    const ejTomoEl = document.getElementById('ej-tomo');
+    const ejCotaEl = document.getElementById('ej-cota');
+    const ejEstadoEl = document.getElementById('ej-estado');
+    const ejUbicEl = document.getElementById('ej-ubicacion');
+    const ejHintEl = document.getElementById('ej-hint');
+    const ejTbody = document.getElementById('ej-tbody');
+    const cotaHintEl = document.getElementById('cota-hint');
 
-  const btnAddEj = document.getElementById('btn-add-ej');
-  const btnCancel = document.getElementById('btn-cancel');
-  const btnSubmit = document.getElementById('btn-submit');
-  const btnReset = document.getElementById('btn-reset');
-  const btnGenerarCota = document.getElementById('btn-generar-cota');
+    const btnAddEj = document.getElementById('btn-add-ej');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSubmit = document.getElementById('btn-submit');
+    const btnReset = document.getElementById('btn-reset');
+    const btnGenerarCota = document.getElementById('btn-generar-cota');
 
-  let catalogsPromise = null;
-  let catalogsCache = null;
-  let tipoActual = {tipo: 'LIBRO', tipoId: 1};
-  let ejemplaresLocal = [];
-  let lockedDoc = false;
-  let tsAutor = null;
-  let tsCarrera = null;
-  let tsArea = null;
-  let tsEjEstado = null;
-  let tsEjUbic = null;
+    let catalogsPromise = null;
+    let catalogsCache = null;
+    let tipoActual = { tipo: 'LIBRO', tipoId: 1 };
+    let ejemplaresLocal = [];
+    let lockedDoc = false;
+    let tsAutor = null;
+    let tsCarrera = null;
+    let tsArea = null;
+    let tsEjEstado = null;
+    let tsEjUbic = null;
 
-  function ensureCss(href){
-    if(document.querySelector(`link[href="${href}"]`)) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = href;
-    document.head.appendChild(l);
-  }
-
-  function ensureScript(src){
-    return new Promise((resolve) => {
-      if(document.querySelector(`script[src="${src}"]`)) return resolve(true);
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = () => resolve(true);
-      s.onerror = () => resolve(false);
-      document.head.appendChild(s);
-    });
-  }
-
-  async function fetchJson(url){
-    const resp = await fetch(url);
-    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.json();
-  }
-
-  function normalizeText(v){
-    const s = String(v ?? '').trim().toLowerCase();
-    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
-  }
-
-  function swalError(title, text){
-    return Swal.fire({icon:'error', title: title || 'Error', text: text || 'Ocurrió un error'});
-  }
-
-  function swalWarn(title, text){
-    return Swal.fire({icon:'warning', title: title || 'Atención', text: text || ''});
-  }
-
-  function swalOk(title, text){
-    return Swal.fire({icon:'success', title: title || 'Listo', text: text || ''});
-  }
-
-  function readCatalogs(){
-    try{
-      const raw = localStorage.getItem(LS_KEY_REG_CATALOGS);
-      if(!raw) return null;
-      const data = JSON.parse(raw);
-      if(!data) return null;
-      if(!Array.isArray(data.ubicaciones) || !Array.isArray(data.estados) || !Array.isArray(data.carreras) || !Array.isArray(data.areas)) return null;
-      return data;
-    }catch(e){
-      return null;
+    function ensureCss(href) {
+      if (document.querySelector(`link[href="${href}"]`)) return;
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      document.head.appendChild(l);
     }
-  }
 
-  function writeCatalogs(data){
-    try{ localStorage.setItem(LS_KEY_REG_CATALOGS, JSON.stringify(data)); }catch(e){}
-  }
-
-  async function loadCatalogs(){
-    if(catalogsCache) return catalogsCache;
-    const ls = readCatalogs();
-    if(ls){
-      catalogsCache = ls;
-      return catalogsCache;
-    }
-    if(!catalogsPromise){
-      catalogsPromise = (async ()=>{
-        const [ubicData, estData, carData, areaData] = await Promise.all([
-          fetchJson('/api/ubicaciones/'),
-          fetchJson('/api/estados-ejemplar/'),
-          fetchJson('/api/carreras/'),
-          fetchJson('/api/areas/'),
-        ]);
-        const ubicaciones = Array.isArray(ubicData) ? ubicData : (ubicData.results || []);
-        const estados = Array.isArray(estData) ? estData : (estData.results || []);
-        const carreras = Array.isArray(carData) ? carData : (carData.results || []);
-        const areas = Array.isArray(areaData) ? areaData : (areaData.results || []);
-        catalogsCache = {ubicaciones, estados, carreras, areas};
-        writeCatalogs(catalogsCache);
-        return catalogsCache;
-      })();
-    }
-    return catalogsPromise;
-  }
-
-  function setLockedState(locked){
-    lockedDoc = !!locked;
-    tituloEl.readOnly = lockedDoc;
-    fechaEl.disabled = lockedDoc;
-
-    if(tsAutor) lockedDoc ? tsAutor.disable() : tsAutor.enable();
-    if(tsCarrera) lockedDoc ? tsCarrera.disable() : tsCarrera.enable();
-    if(tsArea) lockedDoc ? tsArea.disable() : tsArea.enable();
-
-    btnReset.style.display = lockedDoc ? '' : 'none';
-    if(lockedDoc) clearTituloResults();
-  }
-
-  function setTipo(tipo, tipoId){
-    tipoActual = {tipo, tipoId};
-    if(!lockedDoc){
-      docIdEl.value = '';
-      docHintEl.textContent = '';
-    }
-  }
-
-  function clearTituloResults(){
-    tituloResultsEl.style.display = 'none';
-    tituloResultsEl.innerHTML = '';
-  }
-
-  function renderTituloResults(items){
-    if(!items.length){
-      clearTituloResults();
-      return;
-    }
-    tituloResultsEl.innerHTML = items.map(d => {
-      const autores = (d.autores||[]).map(a => `${a.nombre} ${a.apellido}`.trim()).join(', ');
-      const extra = [d.carrera_nombre, d.tipo_nombre].filter(Boolean).join(' · ');
-      return `<div class="lookup-item" data-id="${d.id_documento}">
-        <div class="lookup-title">${d.titulo}</div>
-        <div class="lookup-sub">${autores}${extra ? ' · ' + extra : ''}</div>
-      </div>`;
-    }).join('');
-    tituloResultsEl.style.display = '';
-    tituloResultsEl.querySelectorAll('.lookup-item').forEach(el => {
-      el.addEventListener('click', ()=>{
-        const id = el.getAttribute('data-id');
-        const doc = items.find(x => String(x.id_documento) === String(id));
-        if(!doc) return;
-        seleccionarDocumento(doc);
-        clearTituloResults();
+    function ensureScript(src) {
+      return new Promise((resolve) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
       });
-    });
-  }
+    }
 
-  function seleccionarDocumento(doc){
-    docIdEl.value = doc.id_documento;
-    tituloEl.value = doc.titulo || '';
-    docHintEl.textContent = `Documento existente seleccionado (ID ${doc.id_documento}). Se añadirán solo nuevos ejemplares.`;
+    async function fetchJson(url) {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.json();
+    }
 
-    if(tsCarrera) tsCarrera.setValue(doc.id_carrera ? String(doc.id_carrera) : '', true);
-    else if(carreraEl) carreraEl.value = doc.id_carrera ? String(doc.id_carrera) : '';
+    function normalizeText(v) {
+      const s = String(v ?? '').trim().toLowerCase();
+      return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+    }
 
-    if(fechaEl) fechaEl.value = doc.fecha_publicacion || '';
+    function swalError(title, text) {
+      return Swal.fire({ icon: 'error', title: title || 'Error', text: text || 'Ocurrió un error' });
+    }
 
-    const autor = (doc.autores||[])[0];
-    if(autor){
-      if(tsAutor){
-        tsAutor.addOption({value: String(autor.id_autor), text: `${autor.nombre} ${autor.apellido}`.trim()});
-        tsAutor.setValue(String(autor.id_autor), true);
+    function swalWarn(title, text) {
+      return Swal.fire({ icon: 'warning', title: title || 'Atención', text: text || '' });
+    }
+
+    function swalOk(title, text) {
+      return Swal.fire({ icon: 'success', title: title || 'Listo', text: text || '' });
+    }
+
+    function readCatalogs() {
+      try {
+        const raw = localStorage.getItem(LS_KEY_REG_CATALOGS);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data) return null;
+        if (!Array.isArray(data.ubicaciones) || !Array.isArray(data.estados) || !Array.isArray(data.carreras) || !Array.isArray(data.areas)) return null;
+        return data;
+      } catch (e) {
+        return null;
       }
     }
 
-    if(doc.area_de_conocimiento && tsArea){
-      tsArea.addOption({value: doc.area_de_conocimiento, text: doc.area_de_conocimiento});
-      tsArea.setValue(doc.area_de_conocimiento, true);
+    function writeCatalogs(data) {
+      try { localStorage.setItem(LS_KEY_REG_CATALOGS, JSON.stringify(data)); } catch (e) { }
     }
 
-    setLockedState(true);
-  }
-
-  async function buscarTitulos(term){
-    const params = new URLSearchParams();
-    params.set('q', term);
-    params.set('tipo_doc', String(tipoActual.tipoId));
-    const data = await fetchJson(`/api/documentos/?${params.toString()}`);
-    const items = Array.isArray(data) ? data : (data.results || []);
-    return items.slice(0, 8);
-  }
-
-  function renderEjemplares(){
-    if(!ejemplaresLocal.length){
-      ejTbody.innerHTML = '<tr><td colspan="5" style="color: var(--text-light);">No has agregado ejemplares.</td></tr>';
-      return;
+    async function loadCatalogs() {
+      if (catalogsCache) return catalogsCache;
+      const ls = readCatalogs();
+      if (ls) {
+        catalogsCache = ls;
+        return catalogsCache;
+      }
+      if (!catalogsPromise) {
+        catalogsPromise = (async () => {
+          const [ubicData, estData, carData, areaData] = await Promise.all([
+            fetchJson('/api/ubicaciones/'),
+            fetchJson('/api/estados-ejemplar/'),
+            fetchJson('/api/carreras/'),
+            fetchJson('/api/areas/'),
+          ]);
+          const ubicaciones = Array.isArray(ubicData) ? ubicData : (ubicData.results || []);
+          const estados = Array.isArray(estData) ? estData : (estData.results || []);
+          const carreras = Array.isArray(carData) ? carData : (carData.results || []);
+          const areas = Array.isArray(areaData) ? areaData : (areaData.results || []);
+          catalogsCache = { ubicaciones, estados, carreras, areas };
+          writeCatalogs(catalogsCache);
+          return catalogsCache;
+        })();
+      }
+      return catalogsPromise;
     }
-    ejTbody.innerHTML = ejemplaresLocal.map((e, idx) => `
+
+    function setLockedState(locked) {
+      lockedDoc = !!locked;
+      tituloEl.readOnly = lockedDoc;
+      fechaEl.disabled = lockedDoc;
+
+      if (tsAutor) lockedDoc ? tsAutor.disable() : tsAutor.enable();
+      if (tsCarrera) lockedDoc ? tsCarrera.disable() : tsCarrera.enable();
+      if (tsArea) lockedDoc ? tsArea.disable() : tsArea.enable();
+
+      btnReset.style.display = lockedDoc ? '' : 'none';
+      if (lockedDoc) clearTituloResults();
+    }
+
+    function setTipo(tipo, tipoId) {
+      tipoActual = { tipo, tipoId };
+      if (!lockedDoc) {
+        docIdEl.value = '';
+        docHintEl.textContent = '';
+      }
+    }
+
+    function clearTituloResults() {
+      tituloResultsEl.style.display = 'none';
+      tituloResultsEl.innerHTML = '';
+    }
+
+    function renderTituloResults(items) {
+      if (!items.length) {
+        clearTituloResults();
+        return;
+      }
+      tituloResultsEl.innerHTML = items.map(d => {
+        const autores = (d.autores || []).map(a => `${a.nombre} ${a.apellido}`.trim()).join(', ');
+        const extra = [d.carrera_nombre, d.tipo_nombre].filter(Boolean).join(' · ');
+        return `<div class="lookup-item" data-id="${d.id_documento}">
+        <div class="lookup-title">${d.titulo}</div>
+        <div class="lookup-sub">${autores}${extra ? ' · ' + extra : ''}</div>
+      </div>`;
+      }).join('');
+      tituloResultsEl.style.display = '';
+      tituloResultsEl.querySelectorAll('.lookup-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-id');
+          const doc = items.find(x => String(x.id_documento) === String(id));
+          if (!doc) return;
+          seleccionarDocumento(doc);
+          clearTituloResults();
+        });
+      });
+    }
+
+    function seleccionarDocumento(doc) {
+      docIdEl.value = doc.id_documento;
+      tituloEl.value = doc.titulo || '';
+      docHintEl.textContent = `Documento existente seleccionado (ID ${doc.id_documento}). Se añadirán solo nuevos ejemplares.`;
+
+      if (tsCarrera) tsCarrera.setValue(doc.id_carrera ? String(doc.id_carrera) : '', true);
+      else if (carreraEl) carreraEl.value = doc.id_carrera ? String(doc.id_carrera) : '';
+
+      if (fechaEl) fechaEl.value = doc.fecha_publicacion || '';
+
+      const autor = (doc.autores || [])[0];
+      if (autor) {
+        if (tsAutor) {
+          tsAutor.addOption({ value: String(autor.id_autor), text: `${autor.nombre} ${autor.apellido}`.trim() });
+          tsAutor.setValue(String(autor.id_autor), true);
+        }
+      }
+
+      if (doc.area_de_conocimiento && tsArea) {
+        tsArea.addOption({ value: doc.area_de_conocimiento, text: doc.area_de_conocimiento });
+        tsArea.setValue(doc.area_de_conocimiento, true);
+      }
+
+      setLockedState(true);
+    }
+
+    async function buscarTitulos(term) {
+      const params = new URLSearchParams();
+      params.set('q', term);
+      params.set('tipo_doc', String(tipoActual.tipoId));
+      const data = await fetchJson(`/api/documentos/?${params.toString()}`);
+      const items = Array.isArray(data) ? data : (data.results || []);
+      return items.slice(0, 8);
+    }
+
+    function renderEjemplares() {
+      if (!ejemplaresLocal.length) {
+        ejTbody.innerHTML = '<tr><td colspan="5" style="color: var(--text-light);">No has agregado ejemplares.</td></tr>';
+        return;
+      }
+      ejTbody.innerHTML = ejemplaresLocal.map((e, idx) => `
       <tr>
         <td>${e.tomo || ''}</td>
         <td>${e.codigo_cota || ''}</td>
@@ -353,509 +356,459 @@
         <td style="text-align:right;"><button type="button" class="btn-secondary ej-remove" data-idx="${idx}" style="color:#c00;">Quitar</button></td>
       </tr>
     `).join('');
-    ejTbody.querySelectorAll('.ej-remove').forEach(btn => {
-      btn.addEventListener('click', ()=>{
-        const i = parseInt(btn.getAttribute('data-idx'), 10);
-        ejemplaresLocal.splice(i, 1);
-        renderEjemplares();
+      ejTbody.querySelectorAll('.ej-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.getAttribute('data-idx'), 10);
+          ejemplaresLocal.splice(i, 1);
+          renderEjemplares();
+        });
       });
-    });
-  }
+    }
 
-  async function generarCotaAutomatica() {
-    try {
+
+
+    // Generar cota automáticamente cuando se completen los campos necesarios
+    function verificarYGenerarCota() {
       const titulo = (tituloEl.value || '').trim();
-      const fecha = (fechaEl.value || '').trim();
       const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
-      const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
       const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
-      const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
-      const tomo = ejTomoEl.value || 1;
-      
-      if (!titulo || !autorId) {
-        cotaHintEl.textContent = 'Completa título y autor para generar cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-        return false;
-      }
-      
-      // Obtener apellido del autor
-      let autorApellido = '';
-      if (tsAutor && tsAutor.options[autorId]) {
-        const autorText = tsAutor.options[autorId].text;
-        const partes = autorText.split(' ');
-        autorApellido = partes[partes.length - 1]; // último elemento es el apellido
-      }
-      
-      if (!autorApellido) {
-        cotaHintEl.textContent = 'No se pudo obtener el apellido del autor';
-        cotaHintEl.style.color = 'var(--warning-color)';
-        return false;
-      }
-      
-      const payload = {
-        tipo_documento: tipoActual.tipo,
-        titulo: titulo,
-        autor_apellido: autorApellido,
-        año: fecha ? new Date(fecha).getFullYear() : null,
-        tomo: parseInt(tomo)
-      };
-      
-      if (tipoActual.tipo === 'LIBRO' && area) {
-        payload.area_conocimiento = area;
-      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
-        payload.carrera_id = parseInt(carreraId);
-      }
-      
-      // Incluir ubicación si está seleccionada
-      if (ubicacionId) {
-        payload.ubicacion_id = parseInt(ubicacionId);
-      }
-      
-      const resp = await csrfFetch('/api/generar-cota/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      
-      if (!resp.ok) {
-        const error = await resp.text().catch(() => 'Error generando cota');
-        cotaHintEl.textContent = 'Error generando cota: ' + error.substring(0, 50);
-        cotaHintEl.style.color = 'var(--error-color)';
-        return false;
-      }
-      
-      const result = await resp.json();
-      ejCotaEl.value = result.cota_sugerida || '';
-      
-      if (result.existe && result.alternativas?.length > 0) {
-        cotaHintEl.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i> Cota ya existe, usando alternativa: ${result.alternativas[0]}`;
-        cotaHintEl.style.color = 'var(--warning-color)';
-        ejCotaEl.value = result.alternativas[0];
-      } else {
-        const tomoText = parseInt(tomo) > 1 ? ` (Tomo ${tomo})` : '';
-        cotaHintEl.innerHTML = `<i class="fa-solid fa-check"></i> Cota generada automáticamente${tomoText}`;
-        cotaHintEl.style.color = 'var(--success-color)';
-      }
-      
-      return true;
-      
-    } catch (e) {
-      console.error('Error:', e);
-      cotaHintEl.textContent = 'Error generando cota';
-      cotaHintEl.style.color = 'var(--error-color)';
-      return false;
-    }
-  }
-
-  // Generar cota automáticamente cuando se completen los campos necesarios
-  function verificarYGenerarCota() {
-    const titulo = (tituloEl.value || '').trim();
-    const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
-    const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
-    const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
-    
-    // Solo generar si no hay cota ya y se tienen los datos mínimos
-    if (!ejCotaEl.value.trim() && titulo && autorId) {
-      if (tipoActual.tipo === 'LIBRO' && area) {
-        generarCotaAutomatica();
-      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
-        generarCotaAutomatica();
-      } else if (tipoActual.tipo === 'LIBRO' && !area) {
-        cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-      } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
-        cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-      }
-    }
-  }
-
-  async function generarCotaAutomatica() {
-    try {
-      const titulo = (tituloEl.value || '').trim();
-      const fecha = (fechaEl.value || '').trim();
-      const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
       const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
-      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
-      const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
-      const tomo = ejTomoEl.value || 1;
-      
-      if (!titulo || !autorId) {
-        cotaHintEl.textContent = 'Completa título y autor para generar cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-        return false;
-      }
-      
-      // Obtener apellido del autor
-      let autorApellido = '';
-      if (tsAutor && tsAutor.options[autorId]) {
-        const autorText = tsAutor.options[autorId].text;
-        const partes = autorText.split(' ');
-        autorApellido = partes[partes.length - 1]; // último elemento es el apellido
-      }
-      
-      if (!autorApellido) {
-        cotaHintEl.textContent = 'No se pudo obtener el apellido del autor';
-        cotaHintEl.style.color = 'var(--warning-color)';
-        return false;
-      }
-      
-      const payload = {
-        tipo_documento: tipoActual.tipo,
-        titulo: titulo,
-        autor_apellido: autorApellido,
-        año: fecha ? new Date(fecha).getFullYear() : null,
-        tomo: parseInt(tomo)
-      };
-      
-      if (tipoActual.tipo === 'LIBRO' && area) {
-        payload.area_conocimiento = area;
-      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
-        payload.carrera_id = parseInt(carreraId);
-      }
-      
-      // Incluir ubicación si está seleccionada
-      if (ubicacionId) {
-        payload.ubicacion_id = parseInt(ubicacionId);
-      }
-      
-      const resp = await csrfFetch('/api/generar-cota/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      
-      if (!resp.ok) {
-        const error = await resp.text().catch(() => 'Error generando cota');
-        cotaHintEl.textContent = 'Error generando cota: ' + error.substring(0, 50);
-        cotaHintEl.style.color = 'var(--error-color)';
-        return false;
-      }
-      
-      const result = await resp.json();
-      ejCotaEl.value = result.cota_sugerida || '';
-      
-      if (result.existe && result.alternativas?.length > 0) {
-        cotaHintEl.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i> Cota ya existe, usando alternativa: ${result.alternativas[0]}`;
-        cotaHintEl.style.color = 'var(--warning-color)';
-        ejCotaEl.value = result.alternativas[0];
-      } else {
-        const tomoText = parseInt(tomo) > 1 ? ` (Tomo ${tomo})` : '';
-        cotaHintEl.innerHTML = `<i class="fa-solid fa-check"></i> Cota generada automáticamente${tomoText}`;
-        cotaHintEl.style.color = 'var(--success-color)';
-      }
-      
-      return true;
-      
-    } catch (e) {
-      console.error('Error:', e);
-      cotaHintEl.textContent = 'Error generando cota';
-      cotaHintEl.style.color = 'var(--error-color)';
-      return false;
-    }
-  }
 
-  // Generar cota automáticamente cuando se completen los campos necesarios
-  function verificarYGenerarCota() {
-    const titulo = (tituloEl.value || '').trim();
-    const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
-    const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
-    const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
-    
-    // Solo generar si no hay cota ya y se tienen los datos mínimos
-    if (!ejCotaEl.value.trim() && titulo && autorId) {
-      if (tipoActual.tipo === 'LIBRO' && area) {
-        generarCotaAutomatica();
-      } else if (tipoActual.tipo === 'TESIS' && carreraId) {
-        generarCotaAutomatica();
-      } else if (tipoActual.tipo === 'LIBRO' && !area) {
-        cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-      } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
-        cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
-        cotaHintEl.style.color = 'var(--warning-color)';
-      }
-    }
-  }
-
-  async function initSelects(){
-    ensureCss(TOMSELECT_CSS);
-    const ok = await ensureScript(TOMSELECT_JS);
-
-    const {ubicaciones, estados, carreras, areas} = await loadCatalogs();
-    carreraEl.innerHTML = '<option value="">Sin carrera</option>' + carreras.map(c => `<option value="${c.id_carrera}">${c.nombre_carrera}</option>`).join('');
-    areaEl.innerHTML = '<option value="">Seleccione área</option>' + (areas || []).map(a => `<option value="${String(a).replace(/"/g,'&quot;')}">${a}</option>`).join('');
-    ejEstadoEl.innerHTML = '<option value="">Seleccione estado</option>' + estados.map(s => `<option value="${s.id_estado_ejemplar}">${s.nombre_estado}</option>`).join('');
-    ejUbicEl.innerHTML = '<option value="">Seleccione ubicación</option>' + ubicaciones.map(u => `<option value="${u.id_ubicacion}">${u.descripcion_completa || ('Ubicación #' + u.id_ubicacion)}</option>`).join('');
-
-    if(ok && window.TomSelect){
-      tsCarrera = new TomSelect(carreraEl, {
-        create:false, 
-        allowEmptyOption:true, 
-        placeholder:'Buscar carrera...', 
-        onChange: () => {
-          setTimeout(verificarYGenerarCota, 100);
+      // Solo generar si no hay cota ya y se tienen los datos mínimos
+      if (!ejCotaEl.value.trim() && titulo && autorId) {
+        if (tipoActual.tipo === 'LIBRO' && area) {
+          generarCotaAutomatica();
+        } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+          generarCotaAutomatica();
+        } else if (tipoActual.tipo === 'LIBRO' && !area) {
+          cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
+          cotaHintEl.style.color = 'var(--warning-color)';
+        } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
+          cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
+          cotaHintEl.style.color = 'var(--warning-color)';
         }
-      });
-      tsEjEstado = new TomSelect(ejEstadoEl, {create:false, allowEmptyOption:true, placeholder:'Buscar estado...'});
-      tsEjUbic = new TomSelect(ejUbicEl, {
-        create:false, 
-        allowEmptyOption:true, 
-        placeholder:'Buscar ubicación...',
-        onChange: () => {
-          // Regenerar cota si ya hay una y se cambia la ubicación
-          if (ejCotaEl.value.trim()) {
-            setTimeout(generarCotaAutomatica, 100);
+      }
+    }
+
+    async function generarCotaAutomatica() {
+      try {
+        const titulo = (tituloEl.value || '').trim();
+        const fecha = (fechaEl.value || '').trim();
+        const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+        const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+        const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+        const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
+        const tomo = ejTomoEl.value || 1;
+
+        if (!titulo || !autorId) {
+          cotaHintEl.textContent = 'Completa título y autor para generar cota';
+          cotaHintEl.style.color = 'var(--warning-color)';
+          return false;
+        }
+
+        // Obtener apellido del autor
+        let autorApellido = '';
+        if (tsAutor && tsAutor.options[autorId]) {
+          const autorText = tsAutor.options[autorId].text;
+          const partes = autorText.split(' ');
+          autorApellido = partes[partes.length - 1]; // último elemento es el apellido
+        }
+
+        if (!autorApellido) {
+          cotaHintEl.textContent = 'No se pudo obtener el apellido del autor';
+          cotaHintEl.style.color = 'var(--warning-color)';
+          return false;
+        }
+
+        const payload = {
+          tipo_documento: tipoActual.tipo,
+          titulo: titulo,
+          autor_apellido: autorApellido,
+          año: fecha ? new Date(fecha).getFullYear() : null,
+          tomo: parseInt(tomo)
+        };
+
+        if (tipoActual.tipo === 'LIBRO' && area) {
+          payload.area_conocimiento = area;
+        } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+          payload.carrera_id = parseInt(carreraId);
+        }
+
+        // Incluir ubicación si está seleccionada
+        if (ubicacionId) {
+          payload.ubicacion_id = parseInt(ubicacionId);
+        }
+
+        const resp = await csrfFetch('/api/generar-cota/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+          const error = await resp.text().catch(() => 'Error generando cota');
+          cotaHintEl.textContent = 'Error generando cota: ' + error.substring(0, 50);
+          cotaHintEl.style.color = 'var(--error-color)';
+          return false;
+        }
+
+        const result = await resp.json();
+        let candidate = result.cota_sugerida || '';
+        let msg = '';
+        let msgColor = '';
+
+        if (result.existe && result.alternativas?.length > 0) {
+          candidate = result.alternativas[0];
+          msg = `<i class="fa-solid fa-exclamation-triangle"></i> Cota ya existe en BD, usando alternativa: ${candidate}`;
+          msgColor = 'var(--warning-color)';
+        } else {
+          msg = `<i class="fa-solid fa-check"></i> Cota generada automáticamente`;
+          msgColor = 'var(--success-color)';
+        }
+
+        // Validar conflictos con ejemplares locales (agregados en esta sesión)
+        const tStr = String(tomo);
+        let adjusted = false;
+
+        // Función auxiliar para incrementar sufijo numérico
+        const incrementCota = (c) => {
+          const match = c.match(/^(.*)-(\d+)$/);
+          if (match) {
+            const prefix = match[1];
+            const num = parseInt(match[2], 10) + 1;
+            return `${prefix}-${num}`;
           }
-        }
-      });
+          return `${c}-1`;
+        };
 
-      const autorCache = new Map();
-      tsAutor = new TomSelect(autorEl, {
-        create: (input, callback) => {
-          (async ()=>{
-            const full = String(input || '').trim();
-            if(full.length < 3){ callback(); return; }
-            const parts = full.split(/\s+/);
-            const nombre = parts.shift() || '';
-            const apellido = parts.join(' ');
-            try{
-              const resp = await csrfFetch('/api/autores/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nombre, apellido})});
-              if(!resp.ok){
-                const t = await resp.text().catch(()=> 'Error');
-                await swalError('No se pudo crear autor', t.substring(0,200));
+        while (ejemplaresLocal.some(e => e.codigo_cota === candidate && String(e.tomo) === tStr)) {
+          candidate = incrementCota(candidate);
+          adjusted = true;
+        }
+
+
+        ejCotaEl.value = candidate;
+
+        if (adjusted) {
+          cotaHintEl.innerHTML = `<i class="fa-solid fa-info-circle"></i> Cota ajustada por conflicto local: ${candidate}`;
+          cotaHintEl.style.color = 'var(--info-color, blue)';
+        } else {
+          const tomoText = parseInt(tomo) > 1 ? ` (Tomo ${tomo})` : '';
+          cotaHintEl.innerHTML = msg + tomoText;
+          cotaHintEl.style.color = msgColor;
+        }
+
+        return true;
+
+      } catch (e) {
+        console.error('Error:', e);
+        cotaHintEl.textContent = 'Error generando cota';
+        cotaHintEl.style.color = 'var(--error-color)';
+        return false;
+      }
+    }
+
+    // Generar cota automáticamente cuando se completen los campos necesarios
+    function verificarYGenerarCota() {
+      const titulo = (tituloEl.value || '').trim();
+      const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+      const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+
+      // Solo generar si no hay cota ya y se tienen los datos mínimos
+      if (!ejCotaEl.value.trim() && titulo && autorId) {
+        if (tipoActual.tipo === 'LIBRO' && area) {
+          generarCotaAutomatica();
+        } else if (tipoActual.tipo === 'TESIS' && carreraId) {
+          generarCotaAutomatica();
+        } else if (tipoActual.tipo === 'LIBRO' && !area) {
+          cotaHintEl.textContent = 'Selecciona un área de conocimiento para generar la cota';
+          cotaHintEl.style.color = 'var(--warning-color)';
+        } else if (tipoActual.tipo === 'TESIS' && !carreraId) {
+          cotaHintEl.textContent = 'Selecciona una carrera para generar la cota';
+          cotaHintEl.style.color = 'var(--warning-color)';
+        }
+      }
+    }
+
+    async function initSelects() {
+      ensureCss(TOMSELECT_CSS);
+      const ok = await ensureScript(TOMSELECT_JS);
+
+      const { ubicaciones, estados, carreras, areas } = await loadCatalogs();
+      carreraEl.innerHTML = '<option value="">Sin carrera</option>' + carreras.map(c => `<option value="${c.id_carrera}">${c.nombre_carrera}</option>`).join('');
+      areaEl.innerHTML = '<option value="">Seleccione área</option>' + (areas || []).map(a => `<option value="${String(a).replace(/"/g, '&quot;')}">${a}</option>`).join('');
+      ejEstadoEl.innerHTML = '<option value="">Seleccione estado</option>' + estados.map(s => `<option value="${s.id_estado_ejemplar}">${s.nombre_estado}</option>`).join('');
+      ejUbicEl.innerHTML = '<option value="">Seleccione ubicación</option>' + ubicaciones.map(u => `<option value="${u.id_ubicacion}">${u.descripcion_completa || ('Ubicación #' + u.id_ubicacion)}</option>`).join('');
+
+      if (ok && window.TomSelect) {
+        tsCarrera = new TomSelect(carreraEl, {
+          create: false,
+          allowEmptyOption: true,
+          placeholder: 'Buscar carrera...',
+          onChange: () => {
+            setTimeout(verificarYGenerarCota, 100);
+          }
+        });
+        tsEjEstado = new TomSelect(ejEstadoEl, { create: false, allowEmptyOption: true, placeholder: 'Buscar estado...' });
+        tsEjUbic = new TomSelect(ejUbicEl, {
+          create: false,
+          allowEmptyOption: true,
+          placeholder: 'Buscar ubicación...',
+          onChange: () => {
+            // Regenerar cota si ya hay una y se cambia la ubicación
+            if (ejCotaEl.value.trim()) {
+              setTimeout(generarCotaAutomatica, 100);
+            }
+          }
+        });
+
+        const autorCache = new Map();
+        tsAutor = new TomSelect(autorEl, {
+          create: (input, callback) => {
+            (async () => {
+              const full = String(input || '').trim();
+              if (full.length < 3) { callback(); return; }
+              const parts = full.split(/\s+/);
+              const nombre = parts.shift() || '';
+              const apellido = parts.join(' ');
+              try {
+                const resp = await csrfFetch('/api/autores/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, apellido }) });
+                if (!resp.ok) {
+                  const t = await resp.text().catch(() => 'Error');
+                  await swalError('No se pudo crear autor', t.substring(0, 200));
+                  callback();
+                  return;
+                }
+                const a = await resp.json();
+                callback({ value: String(a.id_autor), text: `${a.nombre} ${a.apellido}`.trim() });
+                setTimeout(verificarYGenerarCota, 100);
+              } catch (e) {
                 callback();
-                return;
               }
-              const a = await resp.json();
-              callback({value: String(a.id_autor), text: `${a.nombre} ${a.apellido}`.trim()});
-              setTimeout(verificarYGenerarCota, 100);
-            }catch(e){
+            })();
+          },
+          valueField: 'value',
+          labelField: 'text',
+          searchField: ['text'],
+          onChange: () => {
+            setTimeout(verificarYGenerarCota, 100);
+          },
+          load: async (query, callback) => {
+            const q = (query || '').trim();
+            if (q.length < 2) return callback();
+            const qn = normalizeText(q);
+            if (autorCache.has(qn)) return callback(autorCache.get(qn));
+            try {
+              const data = await fetchJson(`/api/autores/?search=${encodeURIComponent(q)}`);
+              const items = Array.isArray(data) ? data : (data.results || []);
+              const opts = items.slice(0, 20).map(a => ({ value: String(a.id_autor), text: `${a.nombre} ${a.apellido}`.trim() }));
+              autorCache.set(qn, opts);
+              callback(opts);
+            } catch (e) {
               callback();
             }
-          })();
-        },
-        valueField:'value',
-        labelField:'text',
-        searchField:['text'],
-        onChange: () => {
-          setTimeout(verificarYGenerarCota, 100);
-        },
-        load: async (query, callback) => {
-          const q = (query||'').trim();
-          if(q.length < 2) return callback();
-          const qn = normalizeText(q);
-          if(autorCache.has(qn)) return callback(autorCache.get(qn));
-          try{
-            const data = await fetchJson(`/api/autores/?search=${encodeURIComponent(q)}`);
-            const items = Array.isArray(data) ? data : (data.results || []);
-            const opts = items.slice(0, 20).map(a => ({value: String(a.id_autor), text: `${a.nombre} ${a.apellido}`.trim()}));
-            autorCache.set(qn, opts);
-            callback(opts);
-          }catch(e){
-            callback();
+          }
+        });
+
+        tsArea = new TomSelect(areaEl, {
+          create: false,
+          allowEmptyOption: true,
+          placeholder: 'Buscar área...',
+          onChange: () => {
+            setTimeout(verificarYGenerarCota, 100);
+          }
+        });
+      }
+    }
+
+    let t;
+    tituloEl.addEventListener('input', () => {
+      if (lockedDoc) return;
+      clearTimeout(t);
+      docIdEl.value = '';
+      docHintEl.textContent = '';
+      const term = (tituloEl.value || '').trim();
+      if (term.length < 3) { clearTituloResults(); return; }
+
+      t = setTimeout(async () => {
+        try {
+          const items = await buscarTitulos(term);
+          renderTituloResults(items);
+
+          // Verificar si se puede generar cota después de escribir título
+          if (term.length >= 3) {
+            setTimeout(verificarYGenerarCota, 500);
+          }
+        } catch (e) {
+          clearTituloResults();
+        }
+      }, 250);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!tituloResultsEl.contains(e.target) && e.target !== tituloEl) clearTituloResults();
+    });
+
+    // Regenerar cota cuando cambie el tomo
+    ejTomoEl.addEventListener('change', () => {
+      if (ejCotaEl.value.trim()) {
+        setTimeout(generarCotaAutomatica, 100);
+      }
+    });
+
+    // Botón manual para generar cota
+    btnGenerarCota.addEventListener('click', async () => {
+      btnGenerarCota.disabled = true;
+      const originalHtml = btnGenerarCota.innerHTML;
+      btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+      await generarCotaAutomatica();
+
+      btnGenerarCota.disabled = false;
+      btnGenerarCota.innerHTML = originalHtml;
+    });
+
+    // Regenerar cota cuando cambie el tomo
+    ejTomoEl.addEventListener('change', () => {
+      if (ejCotaEl.value.trim()) {
+        setTimeout(generarCotaAutomatica, 100);
+      }
+    });
+
+    // Botón manual para generar cota
+    btnGenerarCota.addEventListener('click', async () => {
+      btnGenerarCota.disabled = true;
+      const originalHtml = btnGenerarCota.innerHTML;
+      btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+      await generarCotaAutomatica();
+
+      btnGenerarCota.disabled = false;
+      btnGenerarCota.innerHTML = originalHtml;
+    });
+
+    btnAddEj.addEventListener('click', async () => {
+      const tomo = (ejTomoEl.value || '').trim() || null;
+      const cota = (ejCotaEl.value || '').trim();
+      const estadoId = tsEjEstado ? tsEjEstado.getValue() : (ejEstadoEl.value || '');
+      const ubicId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
+      const estadoText = estadoId ? (tsEjEstado ? tsEjEstado.options[estadoId]?.text : ejEstadoEl.selectedOptions?.[0]?.textContent) : '';
+      const ubicText = ubicId ? (tsEjUbic ? tsEjUbic.options[ubicId]?.text : ejUbicEl.selectedOptions?.[0]?.textContent) : '';
+
+      if (!cota || !estadoId || !ubicId) {
+        ejHintEl.textContent = '';
+        await swalWarn('Datos incompletos', 'Debes completar Cota, Estado y Ubicación.');
+        return;
+      }
+      ejHintEl.textContent = '';
+
+      ejemplaresLocal.push({
+        tomo,
+        codigo_cota: cota,
+        id_estado_ejemplar: parseInt(estadoId, 10),
+        estado_text: estadoText || '',
+        id_ubicacion: parseInt(ubicId, 10),
+        ubicacion_text: ubicText || '',
+      });
+      ejCotaEl.value = '';
+      if (tsEjEstado) tsEjEstado.clear(true);
+      if (tsEjUbic) tsEjUbic.clear(true);
+      renderEjemplares();
+    });
+
+    btnCancel.addEventListener('click', () => {
+      window.location.href = '{% url "gestion_inventario" %}';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btnSubmit.disabled = true;
+      try {
+        const titulo = (tituloEl.value || '').trim();
+        const fecha = (fechaEl.value || '').trim();
+        const docId = (docIdEl.value || '').trim();
+
+        const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
+        const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
+        const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+
+        if (!titulo) { await swalWarn('Título requerido'); return; }
+        if (!fecha) { await swalWarn('Fecha requerida'); return; }
+        if (!autorId) { await swalWarn('Autor requerido'); return; }
+        if (!area) { await swalWarn('Área de conocimiento requerida'); return; }
+        if (!ejemplaresLocal.length) { await swalWarn('Agrega al menos un ejemplar'); return; }
+
+        let finalDocId = docId;
+        if (!finalDocId) {
+          const payloadDoc = {
+            titulo,
+            id_tipo_documento: tipoActual.tipoId,
+            fecha_publicacion: fecha,
+            id_carrera: carreraId ? parseInt(carreraId, 10) : null,
+            autores_ids: [parseInt(autorId, 10)],
+            tutor_academico: null,
+            area_de_conocimiento: area,
+          };
+          const resp = await csrfFetch('/api/documentos/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadDoc) });
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => 'Error');
+            await swalError('No se pudo crear el documento', t.substring(0, 200));
+            return;
+          }
+          const created = await resp.json();
+          finalDocId = created.id_documento;
+        }
+
+        const results = [];
+        for (const ej of ejemplaresLocal) {
+          const payloadEj = {
+            codigo_cota: ej.codigo_cota || null,
+            tomo: ej.tomo || null,
+            unidad_fisica: 1,
+            id_estado_ejemplar: ej.id_estado_ejemplar,
+            id_ubicacion: ej.id_ubicacion,
+          };
+          const resp = await csrfFetch(`/api/documentos/${finalDocId}/ejemplares`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadEj) });
+          results.push({ ok: resp.ok });
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => 'Error');
+            await swalError('Error creando ejemplar', t.substring(0, 200));
+            return;
           }
         }
-      });
 
-      tsArea = new TomSelect(areaEl, {
-        create:false,
-        allowEmptyOption:true,
-        placeholder:'Buscar área...',
-        onChange: () => {
-          setTimeout(verificarYGenerarCota, 100);
-        }
-      });
-    }
-  }
-
-  let t;
-  tituloEl.addEventListener('input', ()=>{
-    if(lockedDoc) return;
-    clearTimeout(t);
-    docIdEl.value = '';
-    docHintEl.textContent = '';
-    const term = (tituloEl.value||'').trim();
-    if(term.length < 3){ clearTituloResults(); return; }
-
-    t = setTimeout(async ()=>{
-      try{
-        const items = await buscarTitulos(term);
-        renderTituloResults(items);
-        
-        // Verificar si se puede generar cota después de escribir título
-        if (term.length >= 3) {
-          setTimeout(verificarYGenerarCota, 500);
-        }
-      }catch(e){
-        clearTituloResults();
+        await swalOk('Guardado exitoso');
+        window.location.href = '{% url "gestion_inventario" %}';
+      } finally {
+        btnSubmit.disabled = false;
       }
-    }, 250);
-  });
-
-  document.addEventListener('click', (e)=>{
-    if(!tituloResultsEl.contains(e.target) && e.target !== tituloEl) clearTituloResults();
-  });
-
-  // Regenerar cota cuando cambie el tomo
-  ejTomoEl.addEventListener('change', () => {
-    if (ejCotaEl.value.trim()) {
-      setTimeout(generarCotaAutomatica, 100);
-    }
-  });
-
-  // Botón manual para generar cota
-  btnGenerarCota.addEventListener('click', async () => {
-    btnGenerarCota.disabled = true;
-    const originalHtml = btnGenerarCota.innerHTML;
-    btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-    
-    await generarCotaAutomatica();
-    
-    btnGenerarCota.disabled = false;
-    btnGenerarCota.innerHTML = originalHtml;
-  });
-
-  // Regenerar cota cuando cambie el tomo
-  ejTomoEl.addEventListener('change', () => {
-    if (ejCotaEl.value.trim()) {
-      setTimeout(generarCotaAutomatica, 100);
-    }
-  });
-
-  // Botón manual para generar cota
-  btnGenerarCota.addEventListener('click', async () => {
-    btnGenerarCota.disabled = true;
-    const originalHtml = btnGenerarCota.innerHTML;
-    btnGenerarCota.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-    
-    await generarCotaAutomatica();
-    
-    btnGenerarCota.disabled = false;
-    btnGenerarCota.innerHTML = originalHtml;
-  });
-
-  btnAddEj.addEventListener('click', async ()=>{
-    const tomo = (ejTomoEl.value||'').trim() || null;
-    const cota = (ejCotaEl.value||'').trim();
-    const estadoId = tsEjEstado ? tsEjEstado.getValue() : (ejEstadoEl.value || '');
-    const ubicId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
-    const estadoText = estadoId ? (tsEjEstado ? tsEjEstado.options[estadoId]?.text : ejEstadoEl.selectedOptions?.[0]?.textContent) : '';
-    const ubicText = ubicId ? (tsEjUbic ? tsEjUbic.options[ubicId]?.text : ejUbicEl.selectedOptions?.[0]?.textContent) : '';
-
-    if(!cota || !estadoId || !ubicId){
-      ejHintEl.textContent = '';
-      await swalWarn('Datos incompletos', 'Debes completar Cota, Estado y Ubicación.');
-      return;
-    }
-    ejHintEl.textContent = '';
-
-    ejemplaresLocal.push({
-      tomo,
-      codigo_cota: cota,
-      id_estado_ejemplar: parseInt(estadoId, 10),
-      estado_text: estadoText || '',
-      id_ubicacion: parseInt(ubicId, 10),
-      ubicacion_text: ubicText || '',
     });
-    ejCotaEl.value = '';
-    if(tsEjEstado) tsEjEstado.clear(true);
-    if(tsEjUbic) tsEjUbic.clear(true);
+
+    btnReset.addEventListener('click', async () => {
+      const conf = await Swal.fire({ icon: 'warning', title: 'Nueva búsqueda', text: 'Esto limpiará los campos del documento y los ejemplares agregados. ¿Continuar?', showCancelButton: true, confirmButtonText: 'Sí, limpiar' });
+      if (!conf.isConfirmed) return;
+
+      docIdEl.value = '';
+      docHintEl.textContent = '';
+      tituloEl.value = '';
+      fechaEl.value = '';
+      if (tsAutor) tsAutor.clear(true);
+      if (tsCarrera) tsCarrera.clear(true);
+      if (tsArea) tsArea.clear(true);
+
+      ejemplaresLocal = [];
+      ejCotaEl.value = '';
+      if (tsEjEstado) tsEjEstado.clear(true);
+      if (tsEjUbic) tsEjUbic.clear(true);
+      renderEjemplares();
+
+      setLockedState(false);
+    });
+
+    setTipo('LIBRO', 1);
+    initSelects();
     renderEjemplares();
-  });
-
-  btnCancel.addEventListener('click', ()=>{
-    window.location.href = '{% url "gestion_inventario" %}';
-  });
-
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    btnSubmit.disabled = true;
-    try{
-      const titulo = (tituloEl.value||'').trim();
-      const fecha = (fechaEl.value||'').trim();
-      const docId = (docIdEl.value||'').trim();
-
-      const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value||'');
-      const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value||'');
-      const area = tsArea ? tsArea.getValue() : (areaEl.value||'');
-
-      if(!titulo){ await swalWarn('Título requerido'); return; }
-      if(!fecha){ await swalWarn('Fecha requerida'); return; }
-      if(!autorId){ await swalWarn('Autor requerido'); return; }
-      if(!area){ await swalWarn('Área de conocimiento requerida'); return; }
-      if(!ejemplaresLocal.length){ await swalWarn('Agrega al menos un ejemplar'); return; }
-
-      let finalDocId = docId;
-      if(!finalDocId){
-        const payloadDoc = {
-          titulo,
-          id_tipo_documento: tipoActual.tipoId,
-          fecha_publicacion: fecha,
-          id_carrera: carreraId ? parseInt(carreraId, 10) : null,
-          autores_ids: [parseInt(autorId, 10)],
-          tutor_academico: null,
-          area_de_conocimiento: area,
-        };
-        const resp = await csrfFetch('/api/documentos/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadDoc)});
-        if(!resp.ok){
-          const t = await resp.text().catch(()=> 'Error');
-          await swalError('No se pudo crear el documento', t.substring(0,200));
-          return;
-        }
-        const created = await resp.json();
-        finalDocId = created.id_documento;
-      }
-
-      const results = [];
-      for(const ej of ejemplaresLocal){
-        const payloadEj = {
-          codigo_cota: ej.codigo_cota || null,
-          tomo: ej.tomo || null,
-          unidad_fisica: 1,
-          id_estado_ejemplar: ej.id_estado_ejemplar,
-          id_ubicacion: ej.id_ubicacion,
-        };
-        const resp = await csrfFetch(`/api/documentos/${finalDocId}/ejemplares`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payloadEj)});
-        results.push({ok: resp.ok});
-        if(!resp.ok){
-          const t = await resp.text().catch(()=> 'Error');
-          await swalError('Error creando ejemplar', t.substring(0,200));
-          return;
-        }
-      }
-
-      await swalOk('Guardado exitoso');
-      window.location.href = '{% url "gestion_inventario" %}';
-    } finally {
-      btnSubmit.disabled = false;
-    }
-  });
-
-  btnReset.addEventListener('click', async ()=>{
-    const conf = await Swal.fire({icon:'warning', title:'Nueva búsqueda', text:'Esto limpiará los campos del documento y los ejemplares agregados. ¿Continuar?', showCancelButton:true, confirmButtonText:'Sí, limpiar'});
-    if(!conf.isConfirmed) return;
-
-    docIdEl.value = '';
-    docHintEl.textContent = '';
-    tituloEl.value = '';
-    fechaEl.value = '';
-    if(tsAutor) tsAutor.clear(true);
-    if(tsCarrera) tsCarrera.clear(true);
-    if(tsArea) tsArea.clear(true);
-
-    ejemplaresLocal = [];
-    ejCotaEl.value = '';
-    if(tsEjEstado) tsEjEstado.clear(true);
-    if(tsEjUbic) tsEjUbic.clear(true);
-    renderEjemplares();
-
-    setLockedState(false);
-  });
-
-  setTipo('LIBRO', 1);
-  initSelects();
-  renderEjemplares();
-})();
+  })();
 </script>
 {% endblock %}
