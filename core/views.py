@@ -2335,12 +2335,25 @@ def reportes_page(request):
         return redirect('dashboard')
     
     periodo = request.GET.get('periodo', 'diario')
+    
+    # Obtener fechas personalizadas
+    fecha_inicio_str = request.GET.get('fecha_inicio')
+    fecha_fin_str = request.GET.get('fecha_fin')
+    
     today = timezone.now().date()
     
     start_date = today
     end_date = today
 
-    if periodo == 'semanal':
+    if fecha_inicio_str and fecha_fin_str:
+        try:
+            start_date = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+            periodo = 'personalizado'
+        except ValueError:
+            # Si hay error en formato, fallback a diario
+            pass
+    elif periodo == 'semanal':
         start_date = today - timedelta(days=today.weekday()) # Lunes de esta semana
         end_date = start_date + timedelta(days=6) # Domingo
     elif periodo == 'mensual':
@@ -2361,6 +2374,76 @@ def reportes_page(request):
     )
     total_devoluciones = devoluciones_qs.count()
     
+    # 1. Devoluciones a tiempo vs tardías
+    devoluciones_tardias = devoluciones_qs.filter(
+        fecha_devolucion_real__date__gt=F('fecha_vencimiento')
+    ).count()
+    
+    devoluciones_a_tiempo = total_devoluciones - devoluciones_tardias
+    
+    porc_a_tiempo = round((devoluciones_a_tiempo / total_devoluciones * 100), 1) if total_devoluciones > 0 else 0
+    porc_tardias = round((devoluciones_tardias / total_devoluciones * 100), 1) if total_devoluciones > 0 else 0
+    
+    # 2. Estadísticas por Tipo de Documento (Libro vs Tesis)
+    stats_por_tipo = devoluciones_qs.values(
+        'id_ejemplar__id_documento__id_tipo_documento__nombre_tipo'
+    ).annotate(
+        total=Count('id_detalle_prestamo'),
+        tardias=Count(Case(
+            When(fecha_devolucion_real__date__gt=F('fecha_vencimiento'), then=1),
+            output_field=IntegerField()
+        ))
+    )
+    
+    stats_tipo_list = []
+    for item in stats_por_tipo:
+        total = item['total']
+        tardias = item['tardias']
+        a_tiempo = total - tardias
+        stats_tipo_list.append({
+            'tipo': item['id_ejemplar__id_documento__id_tipo_documento__nombre_tipo'],
+            'total': total,
+            'a_tiempo': a_tiempo,
+            'tardias': tardias,
+            'porc_a_tiempo': round((a_tiempo / total * 100), 1) if total > 0 else 0,
+            'porc_tardias': round((tardias / total * 100), 1) if total > 0 else 0
+        })
+
+    # 3. Usuarios Puntuales vs Impuntuales (basado en devoluciones del periodo)
+    usuarios_actividad = devoluciones_qs.values(
+        'id_prestamo__id_usuario__id_usuario',
+        'id_prestamo__id_usuario__nombre',
+        'id_prestamo__id_usuario__apellido'
+    ).annotate(
+        total_dev=Count('id_detalle_prestamo'),
+        total_tardias=Count(Case(
+            When(fecha_devolucion_real__date__gt=F('fecha_vencimiento'), then=1),
+            output_field=IntegerField()
+        ))
+    )
+    
+    usuarios_puntuales = []
+    usuarios_impuntuales = []
+    
+    for u in usuarios_actividad:
+        tardias = u['total_tardias']
+        total = u['total_dev']
+        user_data = {
+            'nombre': f"{u['id_prestamo__id_usuario__nombre']} {u['id_prestamo__id_usuario__apellido']}",
+            'total': total,
+            'tardias': tardias,
+            'porc_tardanza': round((tardias / total * 100), 1)
+        }
+        
+        if tardias == 0:
+            usuarios_puntuales.append(user_data)
+        else:
+            usuarios_impuntuales.append(user_data)
+            
+    # Ordenar por relevancia
+    usuarios_puntuales.sort(key=lambda x: x['total'], reverse=True)
+    usuarios_impuntuales.sort(key=lambda x: x['tardias'], reverse=True)
+
     # Libros más prestados
     detalles_prestados = DetallePrestamo.objects.filter(
         id_prestamo__fecha_prestamo__date__range=[start_date, end_date]
@@ -2402,5 +2485,13 @@ def reportes_page(request):
         'total_devoluciones': total_devoluciones,
         'top_libros': top_libros_list,
         'top_usuarios': top_usuarios_list,
+        # Nuevos datos
+        'devoluciones_a_tiempo': devoluciones_a_tiempo,
+        'devoluciones_tardias': devoluciones_tardias,
+        'porc_a_tiempo': porc_a_tiempo,
+        'porc_tardias': porc_tardias,
+        'stats_tipo_list': stats_tipo_list,
+        'usuarios_puntuales': usuarios_puntuales,
+        'usuarios_impuntuales': usuarios_impuntuales,
     }
     return render(request, 'reportes.html', context)

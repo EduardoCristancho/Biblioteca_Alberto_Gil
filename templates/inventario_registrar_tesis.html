@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Registrar Nueva Tesis{% endblock %}
+{% block title %}Registrar Nuevo Trabajo de Investigación{% endblock %}
 
 {% block content %}
     <div class="form-header">
         <a href="{% url 'gestion_inventario' %}">
             <i class="fa-solid fa-arrow-left"></i>
-            Registrar Nueva Tesis
+            Registrar Nuevo Trabajo de Investigación
         </a>
-        <p>Ingrese la información completa de la tesis para el catálogo</p>
+        <p>Ingrese la información completa del Trabajo de Investigación para el catálogo</p>
     </div>
 
-    <form class="form-card" id="inv-reg-form" style="max-width: 900px; margin: 0 auto;">
+    <form class="form-card" id="inv-reg-form" style="max-width: 1100px; margin: 0 auto;">
         <input type="hidden" id="doc-id" value="">
         <input type="hidden" id="tipo-documento" value="TESIS">
         <input type="hidden" id="tipo-documento-id" value="2">
 
         <div class="form-section-title">
             <i class="fa-solid fa-graduation-cap" style="color: var(--primary-color);"></i>
-            Información de la Tesis
+            Información del Trabajo de Investigación
         </div>
-        <div class="form-row">
+        <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
             <div class="form-group">
                 <label for="titulo">Título *</label>
                 <div class="lookup-box">
-                    <input type="text" id="titulo" autocomplete="off">
+                    <input type="text" id="titulo" autocomplete="off" style="width: 100%;">
                     <div class="lookup-results" id="titulo-results" style="display:none;"></div>
                     <div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
                         <small id="doc-hint" style="color: var(--text-light);"></small>
@@ -37,35 +37,20 @@
                 <label for="autor">Autor *</label>
                 <select id="autor" placeholder="Buscar autor..."></select>
             </div>
-        </div>
-
-        <div class="form-row">
             <div class="form-group">
                 <label for="carrera">Carrera</label>
                 <select id="carrera" placeholder="Buscar carrera..."></select>
             </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
             <div class="form-group">
                 <label for="fecha">Fecha de Publicación/Defensa *</label>
                 <input type="date" id="fecha">
             </div>
-        </div>
-
-        <div class="form-row">
             <div class="form-group">
                 <label for="tutor">Tutor Académico *</label>
                 <select id="tutor" placeholder="Buscar tutor..."></select>
-            </div>
-        </div>
-
-        <div class="form-section-title">
-            <i class="fa-solid fa-boxes-stacked"></i>
-            Agregar Ejemplares
-        </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label for="ej-tomo">Tomo</label>
-                <input type="number" id="ej-tomo" min="1" max="100" placeholder="Ej. 1" value="1">
             </div>
             <div class="form-group">
                 <label for="ej-cota">Cota *</label>
@@ -83,7 +68,16 @@
             </div>
         </div>
 
-        <div class="form-row">
+        <div class="form-section-title">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            Agregar Ejemplares
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 100px 1fr 1fr auto; gap: 12px; align-items: end; margin-bottom: 10px;">
+            <div class="form-group">
+                <label for="ej-tomo">Tomo</label>
+                <input type="number" id="ej-tomo" min="1" max="100" placeholder="Ej. 1" value="1">
+            </div>
             <div class="form-group">
                 <label for="ej-estado">Estado *</label>
                 <select id="ej-estado" placeholder="Buscar estado..."></select>
@@ -92,11 +86,9 @@
                 <label for="ej-ubicacion">Ubicación *</label>
                 <select id="ej-ubicacion" placeholder="Buscar ubicación..."></select>
             </div>
-        </div>
-
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
-            <button type="button" class="btn-secondary" id="btn-add-ej">Añadir ejemplar</button>
-            <small style="color: var(--text-light);" id="ej-hint"></small>
+            <div style="display:flex; align-items:end;">
+                <button type="button" class="btn-secondary" id="btn-add-ej">Añadir ejemplar</button>
+            </div>
         </div>
 
         <div class="ej-table-wrap">
