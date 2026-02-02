@@ -868,10 +868,19 @@ class EjemplarCreateView(generics.GenericAPIView):
         if not id_estado:
             return Response({'detail': 'id_estado_ejemplar es requerido'}, status=status.HTTP_400_BAD_REQUEST)
 
+        cota = payload.get('codigo_cota')
+        tomo = payload.get('tomo')
+        if cota and tomo:
+            base_cota = cota
+            idx = 1
+            while Ejemplares.objects.filter(codigo_cota=cota, tomo=tomo).exists():
+                cota = f"{base_cota}-{idx}"
+                idx += 1
+
         e = Ejemplares.objects.create(
             id_documento=doc,
-            codigo_cota=payload.get('codigo_cota') or None,
-            tomo=payload.get('tomo') or None,
+            codigo_cota=cota or None,
+            tomo=tomo or None,
             unidad_fisica=unidad_fisica,
             id_estado_ejemplar_id=id_estado,
             id_ubicacion_id=payload.get('id_ubicacion') or None,
@@ -2292,38 +2301,43 @@ class CotaGeneratorView(generics.GenericAPIView):
         return cotas_existentes
     
     def _generar_alternativas(self, cota_base):
-        """Genera cotas alternativas cuando la original ya existe"""
+        """Genera cotas alternativas cuando la original ya existe, priorizando secuencia numérica"""
         
         alternativas = []
         
-        # Para cotas con espacios (formato Dewey), agregar sufijos antes del último espacio
+        # Determinar base y final (para respetar espacios si existen, típico de Dewey)
         if ' ' in cota_base:
             partes = cota_base.rsplit(' ', 1)
             base = partes[0]
             final = partes[1] if len(partes) > 1 else ''
-            
-            # Agregar sufijos alfabéticos
-            for letra in ['a', 'b', 'c', 'd', 'e']:
-                alt = f"{base} {final}{letra}" if final else f"{base}{letra}"
-                if not self._verificar_cota_existente(alt):
-                    alternativas.append(alt)
-            
-            # Agregar sufijos numéricos
-            for i in range(1, 4):
-                alt = f"{base} {final}-{i}" if final else f"{base}-{i}"
-                if not self._verificar_cota_existente(alt):
-                    alternativas.append(alt)
         else:
-            # Para cotas sin espacios, agregar sufijos al final
-            for letra in ['a', 'b', 'c', 'd', 'e']:
-                alt = f"{cota_base}{letra}"
-                if not self._verificar_cota_existente(alt):
-                    alternativas.append(alt)
+            base = cota_base
+            final = ''
+
+        # 1. Intentar secuencia numérica (Prioridad alta)
+        # Buscar el siguiente número disponible: -1, -2, -3...
+        encontrado_num = False
+        idx = 1
+        # Límite de seguridad para evitar loops infinitos, pero suficiente para cubrir casos normales
+        while idx < 50:
+            suffix = f"-{idx}"
+            alt = f"{base} {final}{suffix}" if final else f"{base}{suffix}"
             
-            for i in range(1, 4):
-                alt = f"{cota_base}-{i}"
-                if not self._verificar_cota_existente(alt):
-                    alternativas.append(alt)
+            # Verificar si existe
+            if not self._verificar_cota_existente(alt):
+                alternativas.append(alt)
+                encontrado_num = True
+                break # Solo necesitamos el SIGUIENTE disponible como mejor opción
+            idx += 1
+            
+        # 2. Si no se encontró numérico (raro) o como opciones extra, probar letras
+        # Agregar sufijos alfabéticos como secundario
+        for letra in ['a', 'b', 'c', 'd', 'e']:
+            alt = f"{base} {final}{letra}" if final else f"{base}{letra}"
+            if not self._verificar_cota_existente(alt):
+                alternativas.append(alt)
+                if len(alternativas) >= 3:
+                    break
         
         return alternativas[:3]  # Retornar máximo 3 alternativas
 

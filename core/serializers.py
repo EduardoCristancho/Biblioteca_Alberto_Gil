@@ -135,8 +135,13 @@ class DocumentoCreateSerializer(serializers.Serializer):
         cota = data.get('codigo_cota')
         tomo = data.get('tomo')
         if cota and tomo:
-            if Ejemplares.objects.filter(codigo_cota=cota, tomo=tomo).exists():
-                raise serializers.ValidationError('Conflicto: Ya existe un ejemplar con esa cota y tomo.', code='409')
+            # Si ya existe, agregar sufijo -1, -2, etc.
+            base_cota = cota
+            idx = 1
+            while Ejemplares.objects.filter(codigo_cota=cota, tomo=tomo).exists():
+                cota = f"{base_cota}-{idx}"
+                idx += 1
+            data['codigo_cota'] = cota
 
         # Normalizar área de conocimiento para consistencia (sin restringir a catálogo)
         if tipo == 'LIBRO' and data.get('area_de_conocimiento'):
