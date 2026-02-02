@@ -87,6 +87,7 @@
   const btnConfirmar = document.getElementById('btn-confirmar');
   const btnCancelar = document.getElementById('btn-cancelar');
   const inputCedula = document.getElementById('input-cedula');
+  const inputFechaInicio = document.getElementById('fecha-inicio');
   const inputFechaLimite = document.getElementById('fecha-limite');
   const userSug = document.getElementById('usuario-suggestions');
   const userHint = document.getElementById('usuario-hint');
@@ -388,6 +389,7 @@ function renderResultados(docs) {
 
   btnConfirmar.addEventListener('click', async () => {
     const fechaVenc = inputFechaLimite.value;
+    const fechaInicio = inputFechaInicio ? inputFechaInicio.value : null;
     const idUser = inputCedula.value.trim();
     if(!fechaVenc){
       Swal.fire({icon:'warning', title:'Fecha requerida', text:'Debe indicar la fecha límite de devolución.'});
@@ -403,6 +405,7 @@ function renderResultados(docs) {
     }
     const payload = {
       id_user: idUser,
+      fecha_prestamo: fechaInicio,
       fecha_vencimiento: fechaVenc,
       ejemplares: seleccionados.map(x => ({id_ejemplar: x.id_ejemplar}))
     };

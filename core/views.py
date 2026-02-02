@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.auth.hashers import check_password, make_password
 from django.http import Http404
@@ -964,9 +964,11 @@ class PrestamoListCreateView(generics.GenericAPIView):
 
         # Crear prestamo y detalles
         with transaction.atomic():
+            # Usar fecha provista o fallback a now
+            fecha_prestamo_val = data.get('fecha_prestamo') or timezone.now()
             prestamo = Prestamos.objects.create(
                 id_usuario_id=usuario.id_usuario,
-                fecha_prestamo=timezone.now(),
+                fecha_prestamo=fecha_prestamo_val,
                 observacion=data.get('observacion'),
             )
             # No existe columna fecha_vencimiento en Prestamos, por lo que se almacena en detalle
@@ -2324,3 +2326,81 @@ class CotaGeneratorView(generics.GenericAPIView):
                     alternativas.append(alt)
         
         return alternativas[:3]  # Retornar máximo 3 alternativas
+
+@ensure_csrf_cookie
+@login_required(login_url='login')
+def reportes_page(request):
+    """Vista de reportes (diario, semanal, mensual)"""
+    if not _is_admin_user(request.user):
+        return redirect('dashboard')
+    
+    periodo = request.GET.get('periodo', 'diario')
+    today = timezone.now().date()
+    
+    start_date = today
+    end_date = today
+
+    if periodo == 'semanal':
+        start_date = today - timedelta(days=today.weekday()) # Lunes de esta semana
+        end_date = start_date + timedelta(days=6) # Domingo
+    elif periodo == 'mensual':
+        start_date = today.replace(day=1)
+        # Fin de mes
+        next_month = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        end_date = next_month - timedelta(days=1)
+    
+    # Préstamos en el periodo
+    prestamos_qs = Prestamos.objects.filter(
+        fecha_prestamo__date__range=[start_date, end_date]
+    )
+    total_prestamos = prestamos_qs.count()
+    
+    # Devoluciones en el periodo
+    devoluciones_qs = DetallePrestamo.objects.filter(
+        fecha_devolucion_real__date__range=[start_date, end_date]
+    )
+    total_devoluciones = devoluciones_qs.count()
+    
+    # Libros más prestados
+    detalles_prestados = DetallePrestamo.objects.filter(
+        id_prestamo__fecha_prestamo__date__range=[start_date, end_date]
+    )
+    
+    top_libros = detalles_prestados.values(
+        'id_ejemplar__id_documento__titulo'
+    ).annotate(
+        total=Count('id_ejemplar__id_documento')
+    ).order_by('-total')[:5]
+    
+    top_libros_list = []
+    for item in top_libros:
+        top_libros_list.append({
+            'titulo': item['id_ejemplar__id_documento__titulo'],
+            'total': item['total']
+        })
+
+    # Usuarios más activos
+    top_usuarios = prestamos_qs.values(
+        'id_usuario__nombre', 'id_usuario__apellido'
+    ).annotate(
+        total=Count('id_usuario')
+    ).order_by('-total')[:5]
+    
+    top_usuarios_list = []
+    for item in top_usuarios:
+        top_usuarios_list.append({
+            'nombre': f"{item['id_usuario__nombre']} {item['id_usuario__apellido']}",
+            'total': item['total']
+        })
+
+    context = {
+        'active_page': 'reportes',
+        'periodo': periodo,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_prestamos': total_prestamos,
+        'total_devoluciones': total_devoluciones,
+        'top_libros': top_libros_list,
+        'top_usuarios': top_usuarios_list,
+    }
+    return render(request, 'reportes.html', context)

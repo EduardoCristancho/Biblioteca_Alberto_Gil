@@ -272,6 +272,7 @@ class PrestamoItemSerializer(serializers.Serializer):
 class PrestamoCreateSerializer(serializers.Serializer):
     id_usuario = serializers.IntegerField()
     fecha_vencimiento = serializers.DateField()
+    fecha_prestamo = serializers.DateTimeField(required=False, allow_null=True)
     ejemplares = PrestamoItemSerializer(many=True)
     observacion = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 

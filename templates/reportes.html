@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <div>
+            <h1>Reportes y Estadísticas</h1>
+            <p>Resumen de actividad: {{ start_date|date:"d/m/Y" }} - {{ end_date|date:"d/m/Y" }}</p>
+        </div>
+        <div class="filters">
+            <a href="?periodo=diario" class="btn-filter {% if periodo == 'diario' %}active{% endif %}">Diario</a>
+            <a href="?periodo=semanal" class="btn-filter {% if periodo == 'semanal' %}active{% endif %}">Semanal</a>
+            <a href="?periodo=mensual" class="btn-filter {% if periodo == 'mensual' %}active{% endif %}">Mensual</a>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Total Préstamos</p>
+                <i class="fa-solid fa-file-export blue"></i>
+            </div>
+            <h2>{{ total_prestamos }}</h2>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <p>Total Devoluciones</p>
+                <i class="fa-solid fa-file-import green"></i>
+            </div>
+            <h2>{{ total_devoluciones }}</h2>
+        </div>
+    </div>
+
+    <div class="main-sections">
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-book blue"></i>
+                Libros Más Prestados
+            </div>
+            <div class="item-list">
+                {% if top_libros %}
+                    {% for libro in top_libros %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <p>{{ libro.titulo }}</p>
+                        </div>
+                        <span class="badge">{{ libro.total }} préstamos</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 20px;">
+                        <p>No hay datos en este periodo</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-users purple"></i>
+                Usuarios Más Activos
+            </div>
+            <div class="item-list">
+                {% if top_usuarios %}
+                    {% for usuario in top_usuarios %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <p>{{ usuario.nombre }}</p>
+                        </div>
+                        <span class="badge">{{ usuario.total }} préstamos</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 20px;">
+                        <p>No hay datos en este periodo</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .filters {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-filter {
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #4b5563;
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .btn-filter.active {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .btn-filter:hover:not(.active) {
+            background-color: #f3f4f6;
+        }
+        .badge {
+            background-color: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #4b5563;
+        }
+    </style>
+{% endblock %}
