@@ -42,7 +42,7 @@
 
   <div class="form-row">
     <div class="form-group">
-      <label for="carrera">Carrera</label>
+      <label for="carrera">Carrera *</label>
       <select id="carrera" placeholder="Buscar carrera..."></select>
     </div>
     <div class="form-group">
@@ -130,6 +130,9 @@
     const TOMSELECT_CSS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css';
     const TOMSELECT_JS = 'https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js';
     const LS_KEY_REG_CATALOGS = 'inv_reg_catalogs_v1';
+
+    // Usar la función csrfFetch global del template base
+    const csrfFetch = window.csrfFetch;
 
     const form = document.getElementById('inv-reg-form');
     const tipoToggle = document.getElementById('tipo-toggle');
@@ -231,6 +234,10 @@
 
     async function loadCatalogs() {
       if (catalogsCache) return catalogsCache;
+      
+      // Limpiar caché para forzar recarga
+      localStorage.removeItem(LS_KEY_REG_CATALOGS);
+      
       const ls = readCatalogs();
       if (ls) {
         catalogsCache = ls;
@@ -325,10 +332,6 @@
         }
       }
 
-      if (doc.area_de_conocimiento && tsArea) {
-        tsArea.addOption({ value: doc.area_de_conocimiento, text: doc.area_de_conocimiento });
-        tsArea.setValue(doc.area_de_conocimiento, true);
-      }
       if (doc.tutor_academico && tsTutor) {
         tsTutor.addOption({ value: doc.tutor_academico, text: doc.tutor_academico });
         tsTutor.setValue(doc.tutor_academico, true);
@@ -375,7 +378,7 @@
     function verificarYGenerarCota() {
       const titulo = (tituloEl.value || '').trim();
       const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
-      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+      const area = null;
       const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
 
       // Solo generar si no hay cota ya y se tienen los datos mínimos
@@ -400,7 +403,7 @@
         const fecha = (fechaEl.value || '').trim();
         const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
         const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
-        const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+        const area = null;
         const ubicacionId = tsEjUbic ? tsEjUbic.getValue() : (ejUbicEl.value || '');
         const tomo = ejTomoEl.value || 1;
 
@@ -515,7 +518,7 @@
     function verificarYGenerarCota() {
       const titulo = (tituloEl.value || '').trim();
       const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
-      const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+      const area = null;
       const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
 
       // Solo generar si no hay cota ya y se tienen los datos mínimos
@@ -535,25 +538,71 @@
     }
 
     async function initSelects() {
+      console.log('Iniciando initSelects...');
       ensureCss(TOMSELECT_CSS);
       const ok = await ensureScript(TOMSELECT_JS);
+      console.log('TomSelect cargado:', ok);
 
       const { ubicaciones, estados, carreras, areas } = await loadCatalogs();
-      carreraEl.innerHTML = '<option value="">Sin carrera</option>' + carreras.map(c => `<option value="${c.id_carrera}">${c.nombre_carrera}</option>`).join('');
-      areaEl.innerHTML = '<option value="">Seleccione área</option>' + (areas || []).map(a => `<option value="${String(a).replace(/"/g, '&quot;')}">${a}</option>`).join('');
+      console.log('Catálogos cargados:', { ubicaciones: ubicaciones.length, estados: estados.length, carreras: carreras.length });
+      console.log('Todas las carreras:', carreras);
+      
+      // Carreras específicas para tesis (IDs de la base de datos)
+      const carrerasPermitidas = [1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // IDs de las carreras específicas
+      
+      // Filtrar solo las carreras específicas
+      const carrerasFiltradas = carreras.filter(c => 
+        carrerasPermitidas.includes(c.id_carrera)
+      );
+      
+      console.log('Carreras filtradas:', carrerasFiltradas);
+      console.log('Carreras permitidas:', carrerasPermitidas);
+      
+      // Llenar los elementos select con opciones antes de inicializar TomSelect
+      const carreraOptions = '<option value="">Seleccione carrera *</option>' + 
+        carrerasFiltradas.map(c => `<option value="${c.id_carrera}">${c.nombre_carrera}</option>`).join('');
+      
+      console.log('HTML de carreras:', carreraOptions);
+      carreraEl.innerHTML = carreraOptions;
       ejEstadoEl.innerHTML = '<option value="">Seleccione estado</option>' + estados.map(s => `<option value="${s.id_estado_ejemplar}">${s.nombre_estado}</option>`).join('');
       ejUbicEl.innerHTML = '<option value="">Seleccione ubicación</option>' + ubicaciones.map(u => `<option value="${u.id_ubicacion}">${u.descripcion_completa || ('Ubicación #' + u.id_ubicacion)}</option>`).join('');
 
+      console.log('Elementos HTML poblados');
+
       if (ok && window.TomSelect) {
+        console.log('Inicializando TomSelect...');
+        // Inicializar TomSelect para carrera (obligatorio)
+        if (tsCarrera) {
+          console.log('Destruyendo TomSelect anterior para carrera');
+          tsCarrera.destroy();
+        }
+        
+        console.log('Elemento carrera antes de TomSelect:', carreraEl.innerHTML);
+        
         tsCarrera = new TomSelect(carreraEl, {
           create: false,
-          allowEmptyOption: true,
-          placeholder: 'Buscar carrera...',
+          allowEmptyOption: false,
+          placeholder: 'Seleccione carrera *',
+          maxOptions: null, // Mostrar todas las opciones
           onChange: () => {
             setTimeout(verificarYGenerarCota, 100);
           }
         });
-        tsEjEstado = new TomSelect(ejEstadoEl, { create: false, allowEmptyOption: true, placeholder: 'Buscar estado...' });
+        
+        console.log('TomSelect carrera creado, opciones disponibles:', tsCarrera.options);
+        console.log('TomSelect carrera inicializado');
+        
+        // Inicializar TomSelect para estado de ejemplar
+        if (tsEjEstado) tsEjEstado.destroy();
+        tsEjEstado = new TomSelect(ejEstadoEl, { 
+          create: false, 
+          allowEmptyOption: true, 
+          placeholder: 'Buscar estado...' 
+        });
+        console.log('TomSelect estado inicializado');
+        
+        // Inicializar TomSelect para ubicación
+        if (tsEjUbic) tsEjUbic.destroy();
         tsEjUbic = new TomSelect(ejUbicEl, {
           create: false,
           allowEmptyOption: true,
@@ -565,8 +614,11 @@
             }
           }
         });
+        console.log('TomSelect ubicación inicializado');
 
+        // Inicializar TomSelect para autor
         const autorCache = new Map();
+        if (tsAutor) tsAutor.destroy();
         tsAutor = new TomSelect(autorEl, {
           create: (input, callback) => {
             (async () => {
@@ -614,17 +666,10 @@
           }
         });
 
-        tsArea = new TomSelect(areaEl, {
-          create: false,
-          allowEmptyOption: true,
-          placeholder: 'Buscar área...',
-          onChange: () => {
-            setTimeout(verificarYGenerarCota, 100);
-          }
-        });
-
+        // Inicializar TomSelect para tutor académico
         const tutorCache = new Map();
         const tutorCanon = new Map();
+        if (tsTutor) tsTutor.destroy();
         tsTutor = new TomSelect(tutorEl, {
           create: (input) => {
             const raw = String(input || '').trim();
@@ -654,16 +699,20 @@
             }
           }
         });
+        console.log('TomSelect tutor inicializado');
       }
+      console.log('initSelects completado');
     }
 
-    tipoToggle.querySelectorAll('.radio-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-        opt.classList.add('selected');
-        setTipo(opt.getAttribute('data-tipo'), parseInt(opt.getAttribute('data-tipo-id'), 10));
+    if (tipoToggle) {
+      tipoToggle.querySelectorAll('.radio-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+          opt.classList.add('selected');
+          setTipo(opt.getAttribute('data-tipo'), parseInt(opt.getAttribute('data-tipo-id'), 10));
+        });
       });
-    });
+    }
 
     let t;
     tituloEl.addEventListener('input', () => {
@@ -774,13 +823,13 @@
 
         const autorId = tsAutor ? tsAutor.getValue() : (autorEl.value || '');
         const carreraId = tsCarrera ? tsCarrera.getValue() : (carreraEl.value || '');
-        const area = tsArea ? tsArea.getValue() : (areaEl.value || '');
+        const area = null;
         const tutor = tsTutor ? tsTutor.getValue() : (tutorEl.value || '');
 
         if (!titulo) { await swalWarn('Título requerido'); return; }
         if (!fecha) { await swalWarn('Fecha requerida'); return; }
         if (!autorId) { await swalWarn('Autor requerido'); return; }
-        if (tipoActual.tipo === 'LIBRO' && !area) { await swalWarn('Área de conocimiento requerida'); return; }
+        if (!carreraId) { await swalWarn('Carrera requerida'); return; }
         if (tipoActual.tipo === 'TESIS' && !tutor) { await swalWarn('Tutor académico requerido'); return; }
         if (!ejemplaresLocal.length) { await swalWarn('Agrega al menos un ejemplar'); return; }
 
@@ -840,7 +889,7 @@
       fechaEl.value = '';
       if (tsAutor) tsAutor.clear(true);
       if (tsCarrera) tsCarrera.clear(true);
-      if (tsArea) tsArea.clear(true);
+      
       if (tsTutor) tsTutor.clear(true);
 
       ejemplaresLocal = [];
@@ -852,28 +901,30 @@
       setLockedState(false);
     });
 
-    setTipo('LIBRO', 1);
+    setTipo('TESIS', 2);
     initSelects();
     renderEjemplares();
 
-    // Detectar parámetro de tipo en la URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const tipoParam = urlParams.get('tipo');
-    if (tipoParam) {
-      const tipoUpper = tipoParam.toUpperCase();
-      if (tipoUpper === 'LIBRO') {
-        const libroOption = tipoToggle.querySelector('[data-tipo="LIBRO"]');
-        if (libroOption) {
-          tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-          libroOption.classList.add('selected');
-          setTipo('LIBRO', 1);
-        }
-      } else if (tipoUpper === 'TESIS') {
-        const tesisOption = tipoToggle.querySelector('[data-tipo="TESIS"]');
-        if (tesisOption) {
-          tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-          tesisOption.classList.add('selected');
-          setTipo('TESIS', 2);
+    // Detectar parámetro de tipo en la URL (solo si existe tipoToggle)
+    if (tipoToggle) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tipoParam = urlParams.get('tipo');
+      if (tipoParam) {
+        const tipoUpper = tipoParam.toUpperCase();
+        if (tipoUpper === 'LIBRO') {
+          const libroOption = tipoToggle.querySelector('[data-tipo="LIBRO"]');
+          if (libroOption) {
+            tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+            libroOption.classList.add('selected');
+            setTipo('LIBRO', 1);
+          }
+        } else if (tipoUpper === 'TESIS') {
+          const tesisOption = tipoToggle.querySelector('[data-tipo="TESIS"]');
+          if (tesisOption) {
+            tipoToggle.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+            tesisOption.classList.add('selected');
+            setTipo('TESIS', 2);
+          }
         }
       }
     }
